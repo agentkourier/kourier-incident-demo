@@ -1,0 +1,27 @@
+# The incident demo's MCP tool servers. Every server runs in namespace demo-tools and is registered
+# with kagent as a RemoteMCPServer in namespace kagent. Nothing here creates a Secret: the Secrets
+# below are referenced by name only. Create them out of band, for example:
+#
+#   kubectl -n demo-tools create secret generic demo-pager-slack --from-literal=bot-token=xoxb-...
+#   kubectl -n demo-tools create secret generic demo-slack-ids --from-file=slack-ids.yaml
+#   kubectl -n kagent create secret generic demo-github-token --from-literal=token="Bearer github_pat_..."
+#
+#   demo-tools/demo-pager-slack   key bot-token        the Pager app's bot token (pager)
+#   demo-tools/demo-ic-slack      key bot-token        the incident-commander bot token (slackread)
+#   demo-tools/demo-slack-ids     key slack-ids.yaml   workspace IDs (pager, slackread)
+#   demo-tools/demo-grafana-token key token            Grafana service-account token (grafana)
+#   kagent/demo-github-token      key token            "Bearer <GitHub token>" (github, via headersFrom)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: kourier-incident-demo
+resources:
+  - namespace.yaml
+  - ../../catalog
+  - catalog
+  - pager
+  - rollout
+  - slackread
+  - github
+  - grafana

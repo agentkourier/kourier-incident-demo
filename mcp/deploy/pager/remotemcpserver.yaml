@@ -1,0 +1,7 @@
+apiVersion: api.kagent.dev/v1alpha3
+kind: RemoteMCPServer
+metadata: {name: pager-mcp, namespace: kagent}
+spec:
+  description: "Pager: page a team's on-call in its Slack channel (one page per team per 10 minutes)"
+  protocol: STREAMABLE_HTTP
+  url: http://pager-mcp.demo-tools.svc.cluster.local:8084/mcp

@@ -1,0 +1,39 @@
+# The rollout server's identity. Its only grants are this Role in namespace commerce: read
+# Deployments and ReplicaSets, and update Deployments (a rollback writes the pod template back).
+# Nothing cluster-wide. The server's own allowlist (--allowed-namespace, --allowed-deployments)
+# narrows this further to rolling back payments only.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rollout-mcp
+  namespace: demo-tools
+  labels: {app.kubernetes.io/name: rollout-mcp}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rollout-mcp
+  namespace: commerce
+  labels: {app.kubernetes.io/name: rollout-mcp, app.kubernetes.io/part-of: kourier-incident-demo}
+rules:
+  - apiGroups: [apps]
+    resources: [deployments, replicasets]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rollout-mcp
+  namespace: commerce
+  labels: {app.kubernetes.io/name: rollout-mcp, app.kubernetes.io/part-of: kourier-incident-demo}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rollout-mcp
+subjects:
+  - kind: ServiceAccount
+    name: rollout-mcp
+    namespace: demo-tools

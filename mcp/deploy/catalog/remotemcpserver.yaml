@@ -1,0 +1,7 @@
+apiVersion: api.kagent.dev/v1alpha3
+kind: RemoteMCPServer
+metadata: {name: catalog-mcp, namespace: kagent}
+spec:
+  description: "Software catalog: look up a service's owning team, Slack channel, on-call names, repository and tier"
+  protocol: STREAMABLE_HTTP
+  url: http://catalog-mcp.demo-tools.svc.cluster.local:8084/mcp

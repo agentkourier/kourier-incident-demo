@@ -1,0 +1,7 @@
+apiVersion: api.kagent.dev/v1alpha3
+kind: RemoteMCPServer
+metadata: {name: rollout-mcp, namespace: kagent}
+spec:
+  description: "Rollouts in namespace commerce: read a Deployment's revision history; roll back allowlisted Deployments"
+  protocol: STREAMABLE_HTTP
+  url: http://rollout-mcp.demo-tools.svc.cluster.local:8084/mcp

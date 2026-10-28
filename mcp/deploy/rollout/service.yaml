@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rollout-mcp
+  namespace: demo-tools
+  labels: {app.kubernetes.io/name: rollout-mcp, app.kubernetes.io/component: mcp-server}
+spec:
+  selector: {app.kubernetes.io/name: rollout-mcp}
+  ports:
+    - {name: mcp, port: 8084, targetPort: mcp}

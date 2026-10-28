@@ -1,0 +1,14 @@
+# Packs the catalog entities into the ConfigMap demo-catalog, which the catalog and pager MCP
+# servers mount at /catalog. mcp/deploy includes this directory. slack-ids.yaml is not packed: it
+# holds workspace IDs and goes in the Secret demo-slack-ids instead.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: demo-tools
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: kourier-incident-demo
+configMapGenerator:
+  - name: demo-catalog
+    files:
+      - components.yaml
+      - groups.yaml
