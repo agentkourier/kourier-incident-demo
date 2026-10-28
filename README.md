@@ -12,6 +12,62 @@ decodes `amount` as `int64`, so every response from v2.14.0 fails in checkout wh
 | incident-commander | `#incidents` | `incident-commander` | a mention | posts a page through the Pager app, after a person approves |
 | Agent Kourier (payments) | `#payments-ops` | `payments-sre` | the Pager's page, or a mention | rolls payments back, after a member of the payments user group approves |
 
+## How the incident plays out
+
+Three people take part. The two Slack user groups are what the page mentions and what the rollback approval checks.
+
+| Person | Role | User groups |
+|---|---|---|
+| Priya | checkout on-call: gets the alert, declares the incident, approves the page | none |
+| Dana | payments primary on-call: gets paged, asks for the rollback, approves it | `@payments-oncall`, `@payments-team` |
+| Lee | payments secondary on-call: named in the page's escalation line | `@payments-team` |
+
+The agents read freely. The two actions that change something wait for a person, and Agent Kourier, not the prompt,
+decides who that person can be:
+
+- **`page_team`** (incident-commander, `#incidents`): any member of `#incidents` can approve.
+- **`rollback_deployment`** (payments bot, `#payments-ops`): only `@payments-team` can approve. Anyone else's press is
+  refused with "Only approvers of this Binding can decide this request." and audited.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Priya as Priya<br/>checkout on-call
+    participant AM as Alertmanager
+    participant CA as checkout-assist
+    participant IC as incident-commander
+    participant PG as Pager
+    participant PA as payments bot<br/>(Agent Kourier)
+    actor Dana as Dana<br/>payments on-call
+    participant Pay as payments<br/>Deployment
+
+    Note over Pay: v2.14.0 rolls out
+    AM->>CA: FIRING (1) - CheckoutHighErrorRate
+    CA-->>Priya: cause: payments v2.14.0, owned by payments
+    Priya->>IC: declare SEV2 + link to the alert thread
+    IC->>CA: read_thread (reads the alert thread)
+    IC-->>Priya: approve page_team(payments, SEV2)?
+    Note over Priya,IC: approval: any member of #incidents
+    Priya->>IC: Approve
+    IC->>PG: page_team
+    PG->>Dana: SEV2 for @payments-oncall → paging @Dana
+    PG->>PA: the page post starts the payments bot
+    PA-->>Dana: cause + roll back to v2.13.0?
+    Dana->>PA: roll it back
+    Note over Priya,PA: approval: @payments-team only
+    Priya-xPA: Approve → refused, not an approver
+    Dana->>PA: Approve
+    PA->>Pay: rollback_deployment → v2.13.0
+    Note over Pay: checkout 5xx back to 0
+    Priya->>IC: resolved, write the summary
+    IC-->>Priya: summary from all three channels
+```
+
+`read_thread` reads Slack's history of `#checkout-alerts`; it isn't a message to checkout-assist. In a full run on
+this setup, checkout recovered about three minutes after the rollback.
+
+## Where it runs
+
 It runs on agent-kourier's kind **full tier** (kagent 1.0.0-alpha5 on Agent Substrate, Dex, the verifying front
 door), with the tier's sandbox overlay for the model (`make sandbox-up` in an agent-kourier checkout).
 
@@ -38,6 +94,11 @@ scripts/          rollout, reset, heal
   app's scopes), and Pager (`chat:write`, `chat:write.public`). Their tokens are in
   `~/.config/agent-kourier/demo-checkout-assist.env`, `demo-incident-commander.env` (`SLACK_BOT_TOKEN`,
   `SLACK_APP_TOKEN`) and `demo-pager.env` (`SLACK_BOT_TOKEN`), mode 600.
+- Slack channels and members. `#checkout-alerts`: Priya, checkout-assist. `#incidents`: everyone, incident-commander.
+  `#payments-ops`: Priya, Dana, Lee, the payments bot. incident-commander must also be a member of `#checkout-alerts`
+  and `#payments-ops`, or `read_thread` and `read_recent` fail with `not_in_channel` and it can't see what the other
+  agents found; its Binding still listens only in `#incidents`. Pager needs no membership (`chat:write.public`).
+  User groups `@payments-oncall` (Dana) and `@payments-team` (Dana, Lee).
 - Workspace IDs, which are not committed: `catalog/slack-ids.yaml` (from `slack-ids.example.yaml`) and
   `deploy/kourier/ids.env` (from `ids.example.env`). Load the first and the two bot tokens as Secrets in
   `demo-tools`; see the comment at the top of `mcp/deploy/kustomization.yaml`.
