@@ -85,11 +85,18 @@ ok "the token in demo-tools/demo-grafana-token queries Prometheus through Grafan
 
 # --- Memory -------------------------------------------------------------------------------------------------------------
 echo "memory: kind node $(docker stats --no-stream --format '{{.MemUsage}}' "${NODE}")"
-echo "memory: working sets in ${NS} (cAdvisor, from the kubelet):"
+echo "memory: containers in ${NS} (cAdvisor, from the kubelet; working set = what the limit counts, RSS = anonymous memory):"
 "${K[@]}" get --raw "/api/v1/nodes/${NODE}/proxy/metrics/cadvisor" |
-  awk -v ns="${NS}" '/^container_memory_working_set_bytes\{/ && $0 ~ "namespace=\"" ns "\"" && $0 !~ /container=""/ && $0 ~ /container="/ {
+  awk -v ns="${NS}" '
+    /^container_memory_(working_set_bytes|rss)\{/ && index($0, "namespace=\"" ns "\"") && !index($0, "container=\"\"") {
+      metric = substr($0, 1, index($0, "{") - 1)
       match($0, /container="[^"]*"/); c = substr($0, RSTART + 11, RLENGTH - 12)
       match($0, /pod="[^"]*"/); p = substr($0, RSTART + 5, RLENGTH - 6)
-      v = $(NF - 1); if (v !~ /^[0-9.e+]+$/) v = $NF
-      printf "   %-48s %-36s %6.1f MiB\n", p, c, v / 1048576; total += v
-    } END { printf "   %-85s %6.1f MiB\n", "total", total / 1048576 }'
+      rest = substr($0, index($0, "} ") + 2); split(rest, f, " ")
+      key = p " " c; keys[key] = 1
+      if (metric == "container_memory_rss") rss[key] = f[1]; else ws[key] = f[1]
+    }
+    END {
+      for (k in keys) { split(k, a, " "); printf "   %-48s %-36s ws %6.1f MiB  rss %6.1f MiB\n", a[1], a[2], ws[k] / 1048576, rss[k] / 1048576; tw += ws[k]; tr += rss[k] }
+      printf "   %-85s ws %6.1f MiB  rss %6.1f MiB\n", "total", tw / 1048576, tr / 1048576
+    }'

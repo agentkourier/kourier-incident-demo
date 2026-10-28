@@ -224,6 +224,7 @@ step "Grafana service account ${GRAFANA_SA} and Secret demo-tools/demo-grafana-t
 "${K[@]}" -n "${NS}" rollout status deploy/grafana --timeout=180s >/dev/null
 "${K[@]}" -n "${NS}" port-forward svc/grafana :80 >"${TMP}/pf.log" 2>&1 &
 PF_PID=$!
+disown "${PF_PID}" # no "Terminated" line when cleanup stops it
 GRAFANA=
 for _ in $(seq 1 30); do
   port=$(sed -n 's/^Forwarding from 127\.0\.0\.1:\([0-9]*\) .*/\1/p' "${TMP}/pf.log" | head -1)
@@ -246,9 +247,9 @@ grafana_admin() {
 grafana_token_works() {
   local var=$1
   printf 'header = "Authorization: Bearer %s"\n' "${!var}" |
-    curl -fsS -K - -o /dev/null "${GRAFANA}/api/dashboards/uid/commerce" &&
+    curl -fs -K - -o /dev/null "${GRAFANA}/api/dashboards/uid/commerce" &&
     printf 'header = "Authorization: Bearer %s"\n' "${!var}" |
-    curl -fsS -K - -o /dev/null "${GRAFANA}/api/datasources/proxy/uid/prometheus/api/v1/query?query=up"
+    curl -fs -K - -o /dev/null "${GRAFANA}/api/datasources/proxy/uid/prometheus/api/v1/query?query=up"
 }
 
 sa_id=$(grafana_admin GET "/api/serviceaccounts/search?query=${GRAFANA_SA}" | jq -r --arg n "${GRAFANA_SA}" '.serviceAccounts[] | select(.name == $n) | .id' | head -1)

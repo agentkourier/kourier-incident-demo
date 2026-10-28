@@ -46,4 +46,4 @@ config:
 
 resources:
   requests: {cpu: 50m, memory: 64Mi}
-  limits: {cpu: 500m, memory: 256Mi}
+  limits: {cpu: 500m, memory: 384Mi} # the contrib binary alone maps ~200 MiB of page cache into the working set
