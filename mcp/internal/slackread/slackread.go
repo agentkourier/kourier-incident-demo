@@ -4,6 +4,7 @@ package slackread
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html"
 	"regexp"
@@ -144,7 +145,7 @@ func (r *Reader) channel(name string) (string, string, error) {
 	return name, id, nil
 }
 
-// render formats messages as "HH:MM name: text" lines under header, within MaxOutputBytes.
+// render formats messages as "HH:MM:SS name: text" lines under header, within MaxOutputBytes.
 func (r *Reader) render(ctx context.Context, header string, msgs []slackapi.Message) string {
 	var b strings.Builder
 	b.WriteString(header)
@@ -168,9 +169,9 @@ func (r *Reader) clock(ts string) string {
 	sec, _, _ := strings.Cut(ts, ".")
 	unix, err := strconv.ParseInt(sec, 10, 64)
 	if err != nil {
-		return "??:??"
+		return "??:??:??"
 	}
-	return time.Unix(unix, 0).In(r.loc).Format("15:04")
+	return time.Unix(unix, 0).In(r.loc).Format("15:04:05")
 }
 
 func (r *Reader) author(ctx context.Context, m slackapi.Message) string {
@@ -207,12 +208,20 @@ func (r *Reader) userName(ctx context.Context, id string) string {
 	return name
 }
 
-var mentionPattern = regexp.MustCompile(`<@([UW][A-Z0-9]+)(?:\|[^>]*)?>`)
+var (
+	mentionPattern = regexp.MustCompile(`<@([UW][A-Z0-9]+)(?:\|[^>]*)?>`)
+	datePattern    = regexp.MustCompile(`<!date\^[^|>]*\|([^>]*)>`)
+)
 
 // text is the message text with attachments appended, mentions resolved to names, Slack's
-// escapes undone and newlines folded so each message stays one line.
+// escapes undone and newlines folded so each message stays one line. A message with section or rich_text
+// blocks is read from them instead of its text, which can be a shortened copy.
 func (r *Reader) text(ctx context.Context, m slackapi.Message) string {
-	parts := []string{m.Text}
+	body := m.Text
+	if b := blocksText(m.Blocks); b != "" {
+		body = b
+	}
+	parts := []string{body}
 	for _, a := range m.Attachments {
 		for _, s := range []string{a.Title, a.Text} {
 			if s != "" {
@@ -224,10 +233,61 @@ func (r *Reader) text(ctx context.Context, m slackapi.Message) string {
 		}
 	}
 	text := strings.Join(nonEmpty(parts), " | ")
+	text = datePattern.ReplaceAllString(text, "$1")
 	text = mentionPattern.ReplaceAllStringFunc(text, func(s string) string {
 		return "@" + r.userName(ctx, mentionPattern.FindStringSubmatch(s)[1])
 	})
 	return oneLine(html.UnescapeString(text))
+}
+
+// blocksText joins the text of section and rich_text blocks. Context and action blocks (footers, buttons) are
+// left out.
+func blocksText(blocks []slackapi.Block) string {
+	var parts []string
+	for _, b := range blocks {
+		switch b.Type {
+		case "section":
+			if b.Text != nil {
+				parts = append(parts, b.Text.Text)
+			}
+			for _, f := range b.Fields {
+				parts = append(parts, f.Text)
+			}
+		case "rich_text":
+			var elems []slackapi.RichElement
+			if json.Unmarshal(b.Elements, &elems) != nil {
+				continue
+			}
+			var sb strings.Builder
+			richText(&sb, elems)
+			parts = append(parts, sb.String())
+		}
+	}
+	return strings.Join(nonEmpty(parts), " ")
+}
+
+func richText(sb *strings.Builder, elems []slackapi.RichElement) {
+	for _, e := range elems {
+		switch e.Type {
+		case "text":
+			sb.WriteString(e.Text)
+		case "link":
+			if e.Text != "" {
+				sb.WriteString(e.Text)
+			} else {
+				sb.WriteString(e.URL)
+			}
+		case "user":
+			sb.WriteString("<@" + e.UserID + ">")
+		case "usergroup":
+			sb.WriteString("<!subteam^" + e.GroupID + ">")
+		case "emoji":
+			sb.WriteString(":" + e.Name + ":")
+		default: // a container
+			richText(sb, e.Elements)
+			sb.WriteByte(' ')
+		}
+	}
 }
 
 func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }

@@ -2,12 +2,26 @@
 # ModelConfig sandbox-model, its read-only Kubernetes tool server sandbox-tools and its Substrate worker pool.
 # requireApproval applies to a whole tool binding, so tools that change something get a binding of their own. The
 # only one left is payments-sre's rollback_deployment.
+# The demo's model: the sandbox's OpenRouter key and endpoint, with a model that follows "no text between tool
+# calls" (Haiku 4.5 narrated its steps into every message).
+apiVersion: api.kagent.dev/v1alpha3
+kind: ModelConfig
+metadata: {name: demo-model, namespace: kagent}
+spec:
+  provider: OpenAI
+  model: anthropic/claude-sonnet-5.5
+  apiKeySecret: sandbox-model
+  apiKeySecretKey: apiKey
+  openAI:
+    apiFormat: chatCompletions
+    baseUrl: https://openrouter.ai/api/v1
+---
 apiVersion: api.kagent.dev/v1alpha3
 kind: Agent
 metadata: {name: checkout-sre, namespace: kagent}
 spec:
   template:
-    modelConfig: {name: sandbox-model}
+    modelConfig: {name: demo-model}
     description: The checkout team's read-only SRE assistant for the incident demo
     systemPromptFrom: {name: checkout-sre-prompt, key: systemPrompt}
     tools:
@@ -38,7 +52,7 @@ kind: Agent
 metadata: {name: incident-commander, namespace: kagent}
 spec:
   template:
-    modelConfig: {name: sandbox-model}
+    modelConfig: {name: demo-model}
     description: Incident coordinator for the demo; declares escalated incidents, pages owning teams and writes the summary
     systemPromptFrom: {name: incident-commander-prompt, key: systemPrompt}
     tools:
@@ -65,7 +79,7 @@ kind: Agent
 metadata: {name: payments-sre, namespace: kagent}
 spec:
   template:
-    modelConfig: {name: sandbox-model}
+    modelConfig: {name: demo-model}
     description: The payments team's SRE assistant for the incident demo; can roll payments back with approval
     systemPromptFrom: {name: payments-sre-prompt, key: systemPrompt}
     tools:

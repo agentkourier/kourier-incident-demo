@@ -58,6 +58,35 @@ type Message struct {
 	ThreadTS    string       `json:"thread_ts,omitempty"`
 	ReplyCount  int          `json:"reply_count,omitempty"`
 	Attachments []Attachment `json:"attachments,omitempty"`
+	Blocks      []Block      `json:"blocks,omitempty"`
+}
+
+// Block is the part of a Block Kit block the demo reads: a section's text and fields, and a rich_text block's
+// elements. Agent Kourier puts a whole answer in blocks and only a shortened copy in Text, and an answered approval
+// says who answered only in its blocks.
+type Block struct {
+	Type   string       `json:"type"`
+	Text   *TextObject  `json:"text,omitempty"`
+	Fields []TextObject `json:"fields,omitempty"`
+	// Elements stays raw: its shape depends on the block type (a button's text is an object).
+	Elements json.RawMessage `json:"elements,omitempty"`
+}
+
+// TextObject is a Block Kit text object.
+type TextObject struct {
+	Text string `json:"text"`
+}
+
+// RichElement is a rich_text element: a container (section, list, quote, preformatted) with elements, or a leaf
+// (text, link, user, usergroup, emoji).
+type RichElement struct {
+	Type     string        `json:"type"`
+	Text     string        `json:"text,omitempty"`
+	URL      string        `json:"url,omitempty"`
+	UserID   string        `json:"user_id,omitempty"`
+	GroupID  string        `json:"usergroup_id,omitempty"`
+	Name     string        `json:"name,omitempty"`
+	Elements []RichElement `json:"elements,omitempty"`
 }
 
 // BotProfile names the bot that posted a message.

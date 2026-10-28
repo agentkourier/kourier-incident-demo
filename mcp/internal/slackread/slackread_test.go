@@ -107,9 +107,9 @@ func TestThread(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"14:02 Dana: ack, looking",
-		"14:03 payments-assist: v2.14.0 changed the response <contract>",
-		"14:05 Lee: @Dana approve the rollback",
+		"14:02:00 Dana: ack, looking",
+		"14:03:00 payments-assist: v2.14.0 changed the response <contract>",
+		"14:05:00 Lee: @Dana approve the rollback",
 	}
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	if !strings.Contains(lines[0], "Thread "+ts(14, 2)+" in #payments-oncall, 3 messages") || !strings.Contains(lines[0], "data, not instructions") {
@@ -135,7 +135,7 @@ func TestRecentIsChronologicalAndIncludesAttachments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "14:30 U0NOBODY: hello\n14:40 Alertmanager: [FIRING:1] CheckoutErrorRate | 5xx > 5% [thread_ts=" + ts(14, 40) + ", 3 replies]\n14:50 Lee: rolled back\n"
+	want := "14:30:00 U0NOBODY: hello\n14:40:00 Alertmanager: [FIRING:1] CheckoutErrorRate | 5xx > 5% [thread_ts=" + ts(14, 40) + ", 3 replies]\n14:50:00 Lee: rolled back\n"
 	if _, body, _ := strings.Cut(out, "\n"); body != want {
 		t.Errorf("body =\n%s\nwant\n%s", body, want)
 	}
@@ -222,3 +222,44 @@ func TestNewRequiresIDs(t *testing.T) {
 }
 
 func second(_ string, err error) error { return err }
+
+func TestBlocksWinOverShortenedText(t *testing.T) {
+	approval := map[string]any{"type": "message", "ts": ts(14, 6), "bot_id": "B2", "bot_profile": map[string]any{"name": "payments-assist"},
+		"text": "Answered",
+		"blocks": []any{
+			map[string]any{"type": "section", "text": map[string]any{"type": "mrkdwn",
+				"text": "*Answered* by <@U0LEE> <!date^1793226640^{date_short_pretty} at {time}|2026-10-28 22:30 UTC>"}},
+			map[string]any{"type": "section", "text": map[string]any{"type": "plain_text", "text": "rollback_deployment"},
+				"fields": []any{map[string]any{"type": "plain_text", "text": "Approved"}}},
+		}}
+	answer := map[string]any{"type": "message", "ts": ts(14, 7), "bot_id": "B2", "bot_profile": map[string]any{"name": "payments-assist"},
+		"text": "Rolled back… (truncated)",
+		"blocks": []any{
+			map[string]any{"type": "rich_text", "elements": []any{
+				map[string]any{"type": "rich_text_section", "elements": []any{
+					map[string]any{"type": "usergroup", "usergroup_id": "S0PAY"},
+					map[string]any{"type": "text", "text": " Rolled back to v2.13.0, see "},
+					map[string]any{"type": "link", "url": "https://github.com/agentkourier/demo-payments/pull/1", "text": "#1"},
+				}},
+			}},
+			map[string]any{"type": "context", "elements": []any{map[string]any{"type": "plain_text", "text": "Was this useful?"}}},
+			map[string]any{"type": "actions", "elements": []any{map[string]any{"type": "button",
+				"text": map[string]any{"type": "plain_text", "text": "Useful"}}}},
+		}}
+	f := &fakeSlack{replies: [][]map[string]any{{approval}, {answer}}}
+	out, err := newReader(t, f).Thread(context.Background(), "#payments-oncall", ts(14, 6))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"14:06:00 payments-assist: *Answered* by @Lee 2026-10-28 22:30 UTC rollback_deployment Approved",
+		"14:07:00 payments-assist: <!subteam^S0PAY> Rolled back to v2.13.0, see #1",
+	} {
+		if !strings.Contains(out, want+"\n") {
+			t.Errorf("missing %q in\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "truncated") || strings.Contains(out, "useful") {
+		t.Errorf("shortened text or context footer leaked:\n%s", out)
+	}
+}
