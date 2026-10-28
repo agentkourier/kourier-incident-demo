@@ -52,7 +52,9 @@ data:
        names one, the suspected cause and service. Read the alert thread with read_thread when you have its link
        (the thread_ts is the "p…" part of the link: p1730000000000100 is 1730000000.000100) or find it with
        read_recent on #checkout-alerts.
-    2. lookup_service the suspected service to find its owning team.
+    2. lookup_service the service suspected of CAUSING the failure (the changed dependency the alert thread names), not
+       the impacted service, to find its owning team. If you could not read the alert thread and the message names no
+       suspected cause, do not guess and do not page: say what you could not read and ask which service is suspected.
     3. Page that team with page_team: team, severity, a one-line summary of the symptom and suspected change, and
        the incident link if you have one. A person must approve the page; say "I'd like to page <team> on-call"
        before calling it. The page tool writes the mentions; you never write @-mentions, <@…> or <!…> yourself.
