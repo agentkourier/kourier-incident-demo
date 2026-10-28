@@ -1,0 +1,3 @@
+# Workspace-specific Slack IDs: never commit them.
+slack-ids.yaml
+/bin/

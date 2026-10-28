@@ -1,0 +1,5 @@
+bin/
+deploy/
+Dockerfile
+Makefile
+**/*_test.go
