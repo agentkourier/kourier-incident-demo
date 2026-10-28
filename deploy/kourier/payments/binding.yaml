@@ -1,0 +1,33 @@
+# payments-assist in #payments-ops: investigates when the Pager posts a page, and rolls payments back when a person
+# asks; only members of the payments team's user group may approve the rollback.
+apiVersion: agentkourier.dev/v1alpha1
+kind: Binding
+metadata: {name: payments, namespace: agent-kourier}
+spec:
+  agent:
+    backendRef: {name: agents}
+    namespace: kagent
+    name: payments-sre
+  identity:
+    userId: payments-assist
+    tokenSecretRef: {name: __RELEASE__-token}
+  chat:
+    connectionRef: {name: slack}
+    channel: __PAYMENTS_CHANNEL__
+    output: live
+    threadReplies: mention
+    triggers:
+      - type: mention
+      - type: botMessage
+        from: {id: __PAGER_BOT__}
+        match:
+          text: '^SEV[1-4] for '
+        limits:
+          rateLimit: {maxRuns: 3, per: 10m, maxConcurrent: 1}
+          maxRunsPerDay: 20
+        promptTemplate: |
+          The payments on-call was paged in channel {{ .Channel }} ({{ .Link }}).
+          Investigate whether a payments change explains it, and recommend the fastest mitigation.
+  interactions:
+    toolApprovals: true
+    approverGroups: [__PAYMENTS_APPROVERS__]

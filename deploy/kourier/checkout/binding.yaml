@@ -1,0 +1,47 @@
+# checkout-assist in #checkout-alerts: investigates CheckoutHighErrorRate when Alertmanager posts it, one thread per
+# alert group, and answers people who mention it.
+apiVersion: agentkourier.dev/v1alpha1
+kind: Binding
+metadata: {name: checkout, namespace: agent-kourier}
+spec:
+  agent:
+    backendRef: {name: agents}
+    namespace: kagent
+    name: checkout-sre
+  identity:
+    userId: checkout-assist
+    tokenSecretRef: {name: __RELEASE__-token}
+  chat:
+    connectionRef: {name: slack}
+    channel: __CHECKOUT_CHANNEL__
+    output: live
+    threadReplies: mention
+    triggers:
+      - type: mention
+      - type: botMessage
+        from: {id: __ALERT_BOT__}
+        match:
+          link: 'receiver=checkout-alerts$'
+          title: '^(?:FIRING \(\d+\)|RESOLVED) - '
+          fallback: '^\[(?:FIRING(?::\d+)?|RESOLVED)\] '
+        exclude: {title: ' - Watchdog$'}
+        extract:
+          state:
+            field: title
+            regex: '^(?P<state>FIRING|RESOLVED)'
+          key:
+            field: fallback
+            regex: '^\[[A-Z]+(?::\d+)?\] (?P<key>[^(|]*[^(|\s])'
+          alertname:
+            field: title
+            regex: '^(?:FIRING \(\d+\)|RESOLVED) - (?P<alertname>.+)$'
+        thread:
+          by: key
+          cooldown: 30m
+          closeWhen: {state: RESOLVED}
+        limits:
+          rateLimit: {maxRuns: 5, per: 10m, maxConcurrent: 2}
+          maxRunsPerDay: 40
+        promptTemplate: |
+          Alertmanager posted {{ .Fields.alertname }} ({{ .State }}) in channel {{ .Channel }}.
+          Investigate it: find the likely cause, the evidence, and which team owns the failing dependency.

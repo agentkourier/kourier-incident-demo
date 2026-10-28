@@ -1,0 +1,23 @@
+# incident-commander in #incidents: declares incidents, pages the owning team (a person approves each page) and
+# writes the summary. Any member of #incidents may approve a page.
+apiVersion: agentkourier.dev/v1alpha1
+kind: Binding
+metadata: {name: incident-commander, namespace: agent-kourier}
+spec:
+  agent:
+    backendRef: {name: agents}
+    namespace: kagent
+    name: incident-commander
+  identity:
+    userId: incident-commander
+    tokenSecretRef: {name: __RELEASE__-token}
+  chat:
+    connectionRef: {name: slack}
+    channel: __INCIDENTS_CHANNEL__
+    output: live
+    threadReplies: mention
+    triggers:
+      - type: mention
+  interactions:
+    toolApprovals: true
+  feedback: {enabled: true}

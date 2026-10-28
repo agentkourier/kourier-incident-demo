@@ -1,0 +1,16 @@
+# Shared Helm values for the demo's three Agent Kourier releases (chart charts/agent-kourier from an agent-kourier
+# checkout). install.sh adds the per-release names on the command line.
+image:
+  repository: agent-kourier
+  tag: dev
+  pullPolicy: Never
+rbac:
+  secretNamespaces: [agent-kourier]
+persistence:
+  storageClassName: standard
+  retainOnUninstall: false
+tokenRefresh:
+  enabled: true
+  dex:
+    tokenURL: http://dex.dex.svc.cluster.local:5556/dex/token
+    clientId: agent-kourier-binding
