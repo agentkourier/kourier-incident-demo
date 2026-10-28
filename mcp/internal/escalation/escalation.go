@@ -418,14 +418,15 @@ func versionOf(rs *appsv1.ReplicaSet) string {
 func EscalationMessage(impacted, suspect catalog.Service, ev evidence, summary, link string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Escalation · %s failing (%s of requests 5xx)\n", impacted.Service, pct(ev.impactedRatio))
-	fmt.Fprintf(&b, "Suspected cause: %s %s, rolled out %s, %s before the errors began (owner: %s)\n",
+	fmt.Fprintf(&b, "*Suspected cause:* %s %s, rolled out %s, %s before the errors began (owner: %s)\n",
 		suspect.Service, pager.Escape(ev.version), clock(ev.rolledOut), ev.onset.Sub(ev.rolledOut).Round(time.Second), suspect.Team)
-	fmt.Fprintf(&b, "Evidence: %s → %s calls failing %s · %s 5xx %s\n",
+	fmt.Fprintf(&b, "*Evidence:* %s → %s calls failing %s · %s 5xx %s\n",
 		impacted.Service, suspect.Service, pct(ev.depRatio), suspect.Service, pct(ev.suspectRatio))
+	b.WriteString("*Agent's finding:* ")
 	b.WriteString(summary)
 	if link != "" {
-		b.WriteString(" · ")
-		b.WriteString(link)
+		b.WriteString("\n")
+		b.WriteString(pager.Link(link, "Alert thread"))
 	}
 	return b.String()
 }
@@ -434,7 +435,7 @@ func EscalationMessage(impacted, suspect catalog.Service, ev evidence, summary, 
 func ResolvedMessage(impacted string, since time.Time, permalink string) string {
 	msg := fmt.Sprintf("Resolved · %s error rate under %s since %s", impacted, pct(ResolvedRatio), clock(since))
 	if link, ok := pager.CleanLink(permalink); ok {
-		msg += " · escalation: " + link
+		msg += "\n" + pager.Link(link, "Escalation thread")
 	}
 	return msg
 }

@@ -140,12 +140,19 @@ func Message(severity int, ids slackids.Team, summary, link string) string {
 	if ids.SecondaryUserID != "" {
 		fmt.Fprintf(&b, "Escalates to <@%s> (secondary) if not acknowledged in 5 min.\n", ids.SecondaryUserID)
 	}
+	b.WriteString("*Summary:* ")
 	b.WriteString(summary)
 	if link != "" {
-		b.WriteString(" · ")
-		b.WriteString(link)
+		b.WriteString("\n")
+		b.WriteString(Link(link, "Alert thread"))
 	}
 	return b.String()
+}
+
+// Link formats a cleaned link as Slack link markup with label, which Slack shows as a link even
+// though messages are posted with parse=none (a bare URL is not linked then).
+func Link(link, label string) string {
+	return "<" + link + "|" + label + ">"
 }
 
 // CleanSummary makes model-written text safe to put in a Slack message: whitespace runs (newlines
@@ -177,7 +184,8 @@ func Escape(s string) string {
 }
 
 // CleanLink returns link, escaped, if it is an https URL on slack.com or a subdomain of it, and
-// reports whether it was kept. Anything else is dropped.
+// reports whether it was kept. Anything else is dropped. A "|" is percent-encoded, so the link
+// cannot end early inside Link's markup.
 func CleanLink(link string) (string, bool) {
 	link = strings.TrimSpace(link)
 	if link == "" {
@@ -198,5 +206,5 @@ func CleanLink(link string) (string, bool) {
 			return "", false
 		}
 	}
-	return Escape(out), true
+	return Escape(strings.ReplaceAll(out, "|", "%7C")), true
 }

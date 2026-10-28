@@ -93,7 +93,8 @@ func TestPageMessageFormat(t *testing.T) {
 	got := fake.posts[0]
 	wantText := "SEV2 for <!subteam^S0PAY> → paging <@U0DANA> (primary on-call)\n" +
 		"Escalates to <@U0LEE> (secondary) if not acknowledged in 5 min.\n" +
-		"checkout 502s since payments v2.14.0 · https://kourier.slack.com/archives/C0INC/p1730000000000100"
+		"*Summary:* checkout 502s since payments v2.14.0\n" +
+		"<https://kourier.slack.com/archives/C0INC/p1730000000000100|Alert thread>"
 	if got.Get("text") != wantText {
 		t.Errorf("text =\n%s\nwant\n%s", got.Get("text"), wantText)
 	}
@@ -112,7 +113,7 @@ func TestPageWithoutSecondaryOrLink(t *testing.T) {
 	if _, err := p.Page(context.Background(), Input{Team: "checkout", Severity: 3, Summary: "elevated latency"}); err != nil {
 		t.Fatal(err)
 	}
-	want := "SEV3 for <!subteam^S0CHK> → paging <@U0PRIYA> (primary on-call)\nelevated latency"
+	want := "SEV3 for <!subteam^S0CHK> → paging <@U0PRIYA> (primary on-call)\n*Summary:* elevated latency"
 	if got := fake.posts[0].Get("text"); got != want {
 		t.Errorf("text =\n%s\nwant\n%s", got, want)
 	}
@@ -120,7 +121,7 @@ func TestPageWithoutSecondaryOrLink(t *testing.T) {
 
 func TestPageTeamWithoutGroup(t *testing.T) {
 	ids := slackids.Team{ChannelID: "C0CHK", PrimaryUserID: "U0PRIYA"}
-	if got, want := Message(2, ids, "x", ""), "SEV2 → paging <@U0PRIYA> (primary on-call)\nx"; got != want {
+	if got, want := Message(2, ids, "x", ""), "SEV2 → paging <@U0PRIYA> (primary on-call)\n*Summary:* x"; got != want {
 		t.Errorf("Message = %q, want %q", got, want)
 	}
 }
@@ -143,7 +144,7 @@ func TestPageNeutralisesModelMarkup(t *testing.T) {
 	if len(lines) != 3 {
 		t.Fatalf("text has %d lines, want 3:\n%s", len(lines), text)
 	}
-	wantLast := "&lt;!channel&gt; &lt;@U0EVIL&gt; &lt;https://evil.example|click&gt; &amp; spoof next line"
+	wantLast := "*Summary:* &lt;!channel&gt; &lt;@U0EVIL&gt; &lt;https://evil.example|click&gt; &amp; spoof next line"
 	if lines[2] != wantLast {
 		t.Errorf("summary line = %q, want %q", lines[2], wantLast)
 	}
@@ -186,6 +187,7 @@ func TestCleanLink(t *testing.T) {
 		{"https://user@kourier.slack.com/x", "", false},
 		{"https://kourier.slack.com:8443/x", "", false},
 		{"https://kourier.slack.com/a>b|<!channel>", "https://kourier.slack.com/a%3Eb%7C%3C%21channel%3E", true},
+		{"https://kourier.slack.com/x?a=b|c", "https://kourier.slack.com/x?a=b%7Cc", true},
 		{"javascript:alert(1)", "", false},
 		{"", "", false},
 	}
@@ -194,7 +196,7 @@ func TestCleanLink(t *testing.T) {
 		if got != tt.want || ok != tt.ok {
 			t.Errorf("CleanLink(%q) = %q, %v; want %q, %v", tt.in, got, ok, tt.want, tt.ok)
 		}
-		if strings.ContainsAny(got, "<>") {
+		if strings.ContainsAny(got, "<>|") {
 			t.Errorf("CleanLink(%q) = %q keeps markup", tt.in, got)
 		}
 	}

@@ -263,3 +263,18 @@ func TestBlocksWinOverShortenedText(t *testing.T) {
 		t.Errorf("shortened text or context footer leaked:\n%s", out)
 	}
 }
+
+func TestLinkMarkupBecomesLabelAndURL(t *testing.T) {
+	f := &fakeSlack{replies: [][]map[string]any{{
+		{"type": "message", "ts": ts(14, 8), "bot_id": "B3", "bot_profile": map[string]any{"name": "Pager"},
+			"text": "Resolved · checkout\n<https://kourier.slack.com/archives/C0INC/p1793200000000001|Escalation thread> and <https://slack.com/x?a=1&amp;b=2>"},
+	}, {}}}
+	out, err := newReader(t, f).Thread(context.Background(), "#payments-oncall", ts(14, 8))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "14:08:00 Pager: Resolved · checkout Escalation thread (https://kourier.slack.com/archives/C0INC/p1793200000000001) and https://slack.com/x?a=1&b=2\n"
+	if !strings.Contains(out, want) {
+		t.Errorf("got\n%s\nwant line\n%s", out, want)
+	}
+}

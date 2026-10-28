@@ -232,9 +232,10 @@ func TestEscalatePostsWhenEvidencePasses(t *testing.T) {
 		t.Fatalf("posts = %d, want 1", len(posts))
 	}
 	want := "Escalation · checkout failing (80.0% of requests 5xx)\n" +
-		"Suspected cause: payments v2.14.0, rolled out 19:14:00 UTC, 1m30s before the errors began (owner: payments)\n" +
-		"Evidence: checkout → payments calls failing 99.0% · payments 5xx 0.0%\n" +
-		"checkout cannot decode payments v2.14.0 responses · https://kourier.slack.com/archives/C0CHK/p1793215243835489"
+		"*Suspected cause:* payments v2.14.0, rolled out 19:14:00 UTC, 1m30s before the errors began (owner: payments)\n" +
+		"*Evidence:* checkout → payments calls failing 99.0% · payments 5xx 0.0%\n" +
+		"*Agent's finding:* checkout cannot decode payments v2.14.0 responses\n" +
+		"<https://kourier.slack.com/archives/C0CHK/p1793215243835489|Alert thread>"
 	if got := posts[0].Get("text"); got != want {
 		t.Errorf("text =\n%s\nwant\n%s", got, want)
 	}
@@ -416,7 +417,7 @@ func TestWatcherPostsResolved(t *testing.T) {
 		t.Fatalf("posts = %d, want 2 (escalation, resolved)", len(posts))
 	}
 	got := posts[1].Get("text")
-	want := "Resolved · checkout error rate under 1.0% since 19:20:00 UTC · escalation: https://kourier.slack.com/archives/C0INC/p1793200000000001"
+	want := "Resolved · checkout error rate under 1.0% since 19:20:00 UTC\n<https://kourier.slack.com/archives/C0INC/p1793200000000001|Escalation thread>"
 	if got != want {
 		t.Errorf("resolved =\n%s\nwant\n%s", got, want)
 	}

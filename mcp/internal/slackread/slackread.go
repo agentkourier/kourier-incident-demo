@@ -211,6 +211,7 @@ func (r *Reader) userName(ctx context.Context, id string) string {
 var (
 	mentionPattern = regexp.MustCompile(`<@([UW][A-Z0-9]+)(?:\|[^>]*)?>`)
 	datePattern    = regexp.MustCompile(`<!date\^[^|>]*\|([^>]*)>`)
+	linkPattern    = regexp.MustCompile(`<(https?://[^|>\s]+)(?:\|([^>]*))?>`)
 )
 
 // text is the message text with attachments appended, mentions resolved to names, Slack's
@@ -234,6 +235,13 @@ func (r *Reader) text(ctx context.Context, m slackapi.Message) string {
 	}
 	text := strings.Join(nonEmpty(parts), " | ")
 	text = datePattern.ReplaceAllString(text, "$1")
+	text = linkPattern.ReplaceAllStringFunc(text, func(s string) string { // "label (url)", so the URL stays readable
+		m := linkPattern.FindStringSubmatch(s)
+		if m[2] == "" {
+			return m[1]
+		}
+		return m[2] + " (" + m[1] + ")"
+	})
 	text = mentionPattern.ReplaceAllStringFunc(text, func(s string) string {
 		return "@" + r.userName(ctx, mentionPattern.FindStringSubmatch(s)[1])
 	})
