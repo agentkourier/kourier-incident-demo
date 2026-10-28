@@ -1,5 +1,6 @@
-# payments-assist in #payments-ops: investigates when the Pager posts a page, and rolls payments back when a person
-# asks; only members of the payments team's user group may approve the rollback.
+# payments-assist in #payments-ops: investigates when the Pager posts a page and, when it confirms that the current
+# payments version caused the incident, proposes the rollback. Only members of the payments team's user group may
+# approve it.
 apiVersion: agentkourier.dev/v1alpha1
 kind: Binding
 metadata: {name: payments, namespace: agent-kourier}
@@ -27,7 +28,7 @@ spec:
           maxRunsPerDay: 20
         promptTemplate: |
           The payments on-call was paged in channel {{ .Channel }} ({{ .Link }}).
-          Investigate whether a payments change explains it, and recommend the fastest mitigation.
+          Investigate whether a payments change explains it. If it does, propose the rollback (it needs approval).
   interactions:
     toolApprovals: true
     approverGroups: [__PAYMENTS_APPROVERS__]

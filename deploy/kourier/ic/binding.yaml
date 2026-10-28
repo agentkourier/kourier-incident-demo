@@ -1,5 +1,7 @@
-# incident-commander in #incidents: declares incidents, pages the owning team (a person approves each page) and
-# writes the summary. Any member of #incidents may approve a page.
+# incident-commander in #incidents. It starts when Pager posts an escalation (the escalation tool posts one only after
+# checking the evidence) and declares the incident and pages the owning team; when Pager posts that the impacted
+# service recovered, it writes the summary. A person can still start it with a mention. No tool of this agent needs an
+# approval, so approvals are off: any approval request from it is denied.
 apiVersion: agentkourier.dev/v1alpha1
 kind: Binding
 metadata: {name: incident-commander, namespace: agent-kourier}
@@ -18,6 +20,25 @@ spec:
     threadReplies: mention
     triggers:
       - type: mention
+      - type: botMessage
+        from: {id: __PAGER_BOT__}
+        match:
+          text: '^Escalation · '
+        limits:
+          rateLimit: {maxRuns: 3, per: 30m, maxConcurrent: 1}
+          maxRunsPerDay: 20
+        promptTemplate: |
+          An agent escalated an incident to {{ .Channel }} after the escalation tool checked its evidence ({{ .Link }}).
+          Declare the incident, read the alert thread it links, and page the owner of the suspected cause.
+      - type: botMessage
+        from: {id: __PAGER_BOT__}
+        match:
+          text: '^Resolved · '
+        limits:
+          rateLimit: {maxRuns: 3, per: 30m, maxConcurrent: 1}
+          maxRunsPerDay: 20
+        promptTemplate: |
+          The impacted service recovered ({{ .Link }}). Write the incident summary.
   interactions:
-    toolApprovals: true
+    toolApprovals: false
   feedback: {enabled: true}

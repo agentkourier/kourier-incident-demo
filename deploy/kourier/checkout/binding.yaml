@@ -44,4 +44,5 @@ spec:
           maxRunsPerDay: 40
         promptTemplate: |
           Alertmanager posted {{ .Fields.alertname }} ({{ .State }}) in channel {{ .Channel }}.
+          The alert thread is {{ .Link }}; use it as alert_thread_link.
           Investigate it: find the likely cause, the evidence, and which team owns the failing dependency.

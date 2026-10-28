@@ -1,6 +1,7 @@
 # The demo's three kagent agents (kagent 1.0.0-alpha5 on the agent-kourier kind full tier). They reuse the tier's
 # ModelConfig sandbox-model, its read-only Kubernetes tool server sandbox-tools and its Substrate worker pool.
-# requireApproval applies to a whole tool binding, so tools that change something get a binding of their own.
+# requireApproval applies to a whole tool binding, so tools that change something get a binding of their own. The
+# only one left is payments-sre's rollback_deployment.
 apiVersion: api.kagent.dev/v1alpha3
 kind: Agent
 metadata: {name: checkout-sre, namespace: kagent}
@@ -19,6 +20,11 @@ spec:
       - mcp:
           server: {kind: RemoteMCPServer, name: catalog-mcp}
           tools: [lookup_service, list_services]
+      # escalate_incident posts only after its own evidence check passes; ask_oncall asks a person. Neither changes
+      # anything outside Slack, so neither needs an approval.
+      - mcp:
+          server: {kind: RemoteMCPServer, name: escalation-mcp}
+          tools: [escalate_incident, ask_oncall]
   harness:
     kagent: {}
     workload:
@@ -33,7 +39,7 @@ metadata: {name: incident-commander, namespace: kagent}
 spec:
   template:
     modelConfig: {name: sandbox-model}
-    description: Incident coordinator for the demo; pages owning teams and writes the summary
+    description: Incident coordinator for the demo; declares escalated incidents, pages owning teams and writes the summary
     systemPromptFrom: {name: incident-commander-prompt, key: systemPrompt}
     tools:
       - mcp:
@@ -42,10 +48,10 @@ spec:
       - mcp:
           server: {kind: RemoteMCPServer, name: slackread-mcp}
           tools: [read_thread, read_recent]
+      # A page is how a person gets pulled in; the pager allows one page per team per 10 minutes. No approval.
       - mcp:
           server: {kind: RemoteMCPServer, name: pager-mcp}
           tools: [page_team]
-          requireApproval: true
   harness:
     kagent: {}
     workload:
