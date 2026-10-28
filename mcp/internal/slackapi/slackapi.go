@@ -56,6 +56,7 @@ type Message struct {
 	Text        string       `json:"text"`
 	TS          string       `json:"ts"`
 	ThreadTS    string       `json:"thread_ts,omitempty"`
+	ReplyCount  int          `json:"reply_count,omitempty"`
 	Attachments []Attachment `json:"attachments,omitempty"`
 }
 

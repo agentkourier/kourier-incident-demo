@@ -126,7 +126,7 @@ func TestThread(t *testing.T) {
 func TestRecentIsChronologicalAndIncludesAttachments(t *testing.T) {
 	f := &fakeSlack{history: []map[string]any{
 		msg(ts(14, 50), "U0LEE", "rolled back"),
-		{"type": "message", "ts": ts(14, 40), "username": "Alertmanager", "text": "",
+		{"type": "message", "ts": ts(14, 40), "username": "Alertmanager", "text": "", "thread_ts": ts(14, 40), "reply_count": 3,
 			"attachments": []any{map[string]any{"title": "[FIRING:1] CheckoutErrorRate", "text": "5xx > 5%"}}},
 		msg(ts(14, 30), "U0NOBODY", "hello"),
 	}}
@@ -135,7 +135,7 @@ func TestRecentIsChronologicalAndIncludesAttachments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "14:30 U0NOBODY: hello\n14:40 Alertmanager: [FIRING:1] CheckoutErrorRate | 5xx > 5%\n14:50 Lee: rolled back\n"
+	want := "14:30 U0NOBODY: hello\n14:40 Alertmanager: [FIRING:1] CheckoutErrorRate | 5xx > 5% [thread_ts=" + ts(14, 40) + ", 3 replies]\n14:50 Lee: rolled back\n"
 	if _, body, _ := strings.Cut(out, "\n"); body != want {
 		t.Errorf("body =\n%s\nwant\n%s", body, want)
 	}

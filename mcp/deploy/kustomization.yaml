@@ -25,3 +25,11 @@ resources:
   - slackread
   - github
   - grafana
+# The GitHub MCP server stays at zero replicas until its token Secret (kagent/demo-github-token) exists.
+# Scale it up with: kubectl -n demo-tools scale deploy/github-mcp --replicas=1
+patches:
+  - target: {kind: Deployment, name: github-mcp}
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0

@@ -48,7 +48,8 @@ spec:
             - --allowed-hosts=grafana-mcp.demo-tools.svc.cluster.local:8084,grafana-mcp.demo-tools.svc:8084,grafana-mcp.demo-tools:8084,grafana-mcp:8084
             - --healthz-address=:8080
             - --disable-write
-            - --enabled-tools=search,datasource,prometheus,loki,alerting,dashboard,navigation
+            - --usage-stats=disabled  # no anonymous usage reports to Grafana Labs
+            - --enabled-tools=search,datasource,prometheus,tempo,alerting,dashboard,navigation
           env:
             - name: GRAFANA_URL
               value: http://grafana.observability.svc.cluster.local
