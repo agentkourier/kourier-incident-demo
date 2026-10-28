@@ -1,0 +1,88 @@
+# The demo's three kagent agents (kagent 1.0.0-alpha5 on the agent-kourier kind full tier). They reuse the tier's
+# ModelConfig sandbox-model, its read-only Kubernetes tool server sandbox-tools and its Substrate worker pool.
+# requireApproval applies to a whole tool binding, so tools that change something get a binding of their own.
+apiVersion: api.kagent.dev/v1alpha3
+kind: Agent
+metadata: {name: checkout-sre, namespace: kagent}
+spec:
+  template:
+    modelConfig: {name: sandbox-model}
+    description: The checkout team's read-only SRE assistant for the incident demo
+    systemPromptFrom: {name: checkout-sre-prompt, key: systemPrompt}
+    tools:
+      - mcp:
+          server: {kind: RemoteMCPServer, name: sandbox-tools}
+          tools: [k8s_get_resources, k8s_describe_resource, k8s_get_pod_logs, k8s_get_events, k8s_get_resource_yaml]
+      - mcp:
+          server: {kind: RemoteMCPServer, name: grafana-mcp}
+          tools: [query_prometheus, list_prometheus_label_values, search_tempo_traces, get_tempo_trace, query_tempo_metrics, list_tempo_attribute_values]
+      - mcp:
+          server: {kind: RemoteMCPServer, name: catalog-mcp}
+          tools: [lookup_service, list_services]
+  harness:
+    kagent: {}
+    workload:
+      image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:ed668c38a5805723912497d4ea085e711cf585d440907abfff3dd27991d768cc
+    substrate:
+      workerPoolRef: {name: kagent-default}
+      snapshotPolicy: {location: gs://ate-snapshots/kagent/}
+---
+apiVersion: api.kagent.dev/v1alpha3
+kind: Agent
+metadata: {name: incident-commander, namespace: kagent}
+spec:
+  template:
+    modelConfig: {name: sandbox-model}
+    description: Incident coordinator for the demo; pages owning teams and writes the summary
+    systemPromptFrom: {name: incident-commander-prompt, key: systemPrompt}
+    tools:
+      - mcp:
+          server: {kind: RemoteMCPServer, name: catalog-mcp}
+          tools: [lookup_service, list_services]
+      - mcp:
+          server: {kind: RemoteMCPServer, name: slackread-mcp}
+          tools: [read_thread, read_recent]
+      - mcp:
+          server: {kind: RemoteMCPServer, name: pager-mcp}
+          tools: [page_team]
+          requireApproval: true
+  harness:
+    kagent: {}
+    workload:
+      image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:ed668c38a5805723912497d4ea085e711cf585d440907abfff3dd27991d768cc
+    substrate:
+      workerPoolRef: {name: kagent-default}
+      snapshotPolicy: {location: gs://ate-snapshots/kagent/}
+---
+apiVersion: api.kagent.dev/v1alpha3
+kind: Agent
+metadata: {name: payments-sre, namespace: kagent}
+spec:
+  template:
+    modelConfig: {name: sandbox-model}
+    description: The payments team's SRE assistant for the incident demo; can roll payments back with approval
+    systemPromptFrom: {name: payments-sre-prompt, key: systemPrompt}
+    tools:
+      - mcp:
+          server: {kind: RemoteMCPServer, name: sandbox-tools}
+          tools: [k8s_get_resources, k8s_describe_resource, k8s_get_pod_logs, k8s_get_events]
+      - mcp:
+          server: {kind: RemoteMCPServer, name: grafana-mcp}
+          tools: [query_prometheus, search_tempo_traces, get_tempo_trace, query_tempo_metrics]
+      - mcp:
+          server: {kind: RemoteMCPServer, name: catalog-mcp}
+          tools: [lookup_service]
+      - mcp:
+          server: {kind: RemoteMCPServer, name: rollout-mcp}
+          tools: [rollout_history]
+      - mcp:
+          server: {kind: RemoteMCPServer, name: rollout-mcp}
+          tools: [rollback_deployment]
+          requireApproval: true
+  harness:
+    kagent: {}
+    workload:
+      image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:ed668c38a5805723912497d4ea085e711cf585d440907abfff3dd27991d768cc
+    substrate:
+      workerPoolRef: {name: kagent-default}
+      snapshotPolicy: {location: gs://ate-snapshots/kagent/}
