@@ -1,0 +1,55 @@
+# payments, owned by the payments team. Version v2.13.0 is the good release; scripts/rollout.sh moves it between
+# versions, changing the image, the version label and the revision annotation together, as a CD system would.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments
+  namespace: commerce
+  labels: {app.kubernetes.io/name: payments, app.kubernetes.io/part-of: commerce}
+spec:
+  replicas: 3
+  minReadySeconds: 30
+  revisionHistoryLimit: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  selector:
+    matchLabels: {app.kubernetes.io/name: payments}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: payments
+        app.kubernetes.io/part-of: commerce
+        app.kubernetes.io/version: v2.13.0
+      annotations:
+        demo.agentkourier.dev/git-revision: 62a0f589878145167725eb2656f3952aca6ff559
+        kubernetes.io/change-cause: deploy payments v2.13.0
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: payments
+          image: demo-payments:v2.13.0
+          imagePullPolicy: Never
+          ports: [{name: http, containerPort: 8080}]
+          env:
+            - {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://otel-collector.observability.svc:4317"}
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: k8s.namespace.name=commerce
+          readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 10}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 200m, memory: 64Mi}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments
+  namespace: commerce
+  labels: {app.kubernetes.io/name: payments, app.kubernetes.io/part-of: commerce}
+spec:
+  selector: {app.kubernetes.io/name: payments}
+  ports: [{name: http, port: 8080, targetPort: http}]
