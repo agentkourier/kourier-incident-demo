@@ -1,0 +1,49 @@
+# open-telemetry/opentelemetry-collector 0.178.0 (collector 0.163.2, contrib image), release "otel-collector" in namespace
+# observability, one Deployment. Services send OTLP to otel-collector.observability.svc:4317 (gRPC) or :4318 (HTTP);
+# traces go through memory_limiter, k8sattributes and batch to Tempo. Its own metrics are on :8888 for Prometheus.
+mode: deployment
+fullnameOverride: otel-collector
+image:
+  repository: otel/opentelemetry-collector-contrib
+
+# The k8sattributes processor: the chart adds it to the pipelines and creates the ClusterRole it needs (get/list/watch on
+# pods, namespaces and replicasets) bound to the collector's ServiceAccount. Spans get k8s.namespace.name, k8s.pod.name,
+# k8s.deployment.name and the rest, matched on the sending pod's IP.
+presets:
+  kubernetesAttributes:
+    enabled: true
+
+ports:
+  jaeger-compact: {enabled: false}
+  jaeger-thrift: {enabled: false}
+  jaeger-grpc: {enabled: false}
+  zipkin: {enabled: false}
+  metrics: {enabled: true}
+
+config:
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus: null
+  exporters:
+    otlp/tempo:
+      endpoint: tempo.observability.svc:4317
+      tls: {insecure: true}
+  processors:
+    memory_limiter:
+      check_interval: 5s
+      limit_percentage: 80
+      spike_limit_percentage: 25
+    batch: {}
+  service:
+    pipelines:
+      logs: null
+      metrics: null
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, k8sattributes, batch]
+        exporters: [otlp/tempo]
+
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {cpu: 500m, memory: 384Mi} # the contrib binary alone maps ~200 MiB of page cache into the working set

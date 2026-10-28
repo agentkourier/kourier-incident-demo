@@ -1,0 +1,47 @@
+# The load generator in namespace commerce: 5 checkout orders a second to the checkout Service. The image is built locally
+# and loaded into kind (`docker build -t demo-loadgen:dev loadgen/ && kind load docker-image demo-loadgen:dev --name agent-kourier-full`),
+# hence imagePullPolicy: Never. Apply it once checkout runs: kubectl --context kind-agent-kourier-full apply -f loadgen/deploy/
+# Change the rate with: kubectl -n commerce set env deploy/loadgen RATE=10
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+  namespace: commerce
+  labels:
+    app.kubernetes.io/name: loadgen
+    # Not part-of commerce: Prometheus's commerce job scrapes only the services, and loadgen has no metrics endpoint.
+    app.kubernetes.io/part-of: commerce-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: loadgen
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: loadgen
+        app.kubernetes.io/part-of: commerce-demo
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: loadgen
+          image: demo-loadgen:dev
+          imagePullPolicy: Never
+          env:
+            - name: CHECKOUT_URL
+              value: http://checkout.commerce.svc:8080
+            - name: RATE
+              value: "5"
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 200m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}

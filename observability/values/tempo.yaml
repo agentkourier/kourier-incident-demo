@@ -1,0 +1,28 @@
+# grafana/tempo 1.24.4 (Tempo 2.9.0, single binary), release "tempo" in namespace observability: Service tempo:3200 (HTTP API),
+# :4317 (OTLP gRPC), :4318 (OTLP HTTP). No volume: traces live in an emptyDir for the pod's life.
+persistence: {enabled: false}
+
+tempo:
+  memBallastSizeMbs: 0
+  reportingEnabled: false
+  retention: 6h
+  receivers:
+    otlp:
+      protocols:
+        grpc: {endpoint: "0.0.0.0:4317"}
+        http: {endpoint: "0.0.0.0:4318"}
+  # Service graph and span metrics, written to Prometheus (which runs with the remote-write receiver on), for Grafana's
+  # service map and traces-to-metrics links. service.version is a span-metrics dimension (service_version in Prometheus).
+  metricsGenerator:
+    enabled: true
+    remoteWriteUrl: http://prometheus-server.observability.svc/api/v1/write
+    processor:
+      span_metrics:
+        dimensions: [service.version]
+  overrides:
+    defaults:
+      metrics_generator:
+        processors: [service-graphs, span-metrics]
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: "1", memory: 512Mi}

@@ -1,0 +1,17 @@
+route:
+  receiver: "null"
+  routes:
+  - receiver: monitoring/sink/sink
+    group_by:
+    - alertname
+    continue: true
+    group_wait: 1s
+    group_interval: 5s
+    repeat_interval: 1h
+receivers:
+- name: "null"
+- name: monitoring/sink/sink
+  webhook_configs:
+  - send_resolved: true
+    url: http://sink.e2e.svc.cluster.local:8080/alertmanager
+templates: []

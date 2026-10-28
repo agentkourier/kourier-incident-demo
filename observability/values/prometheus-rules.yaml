@@ -1,0 +1,43 @@
+# The demo's rules, as prometheus-community/prometheus values (a second -f file next to prometheus.yaml).
+# observability/scripts/check.sh renders the chart and runs promtool on what Prometheus will load.
+serverFiles:
+  recording_rules.yml:
+    groups:
+      - name: commerce.recording
+        rules:
+          # Request rate and 5xx ratio per service and version (app.kubernetes.io/version on the pod).
+          - record: namespace_app_version:http_requests:rate1m
+            expr: sum by (namespace, app, version) (rate(http_requests_total{namespace="commerce"}[1m]))
+          # "or ... * 0" makes the ratio 0, not absent, while a version serves no 5xx.
+          - record: namespace_app_version:http_requests_5xx:ratio_rate1m
+            expr: |
+              (
+                sum by (namespace, app, version) (rate(http_requests_total{namespace="commerce", code=~"5.."}[1m]))
+                  or
+                sum by (namespace, app, version) (rate(http_requests_total{namespace="commerce"}[1m])) * 0
+              )
+                /
+              sum by (namespace, app, version) (rate(http_requests_total{namespace="commerce"}[1m]))
+          # checkout's calls to payments, by outcome (ok, http_error, decode_error).
+          - record: namespace_app:payments_client_requests:rate1m
+            expr: sum by (namespace, app, outcome) (rate(payments_client_requests_total{namespace="commerce"}[1m]))
+
+  alerting_rules.yml:
+    groups:
+      - name: commerce.alerts
+        rules:
+          - alert: CheckoutHighErrorRate
+            expr: |
+              sum(rate(http_requests_total{namespace="commerce", app="checkout", code=~"5..", handler!~"/healthz|/readyz|/livez|/metrics"}[1m]))
+                /
+              sum(rate(http_requests_total{namespace="commerce", app="checkout", handler!~"/healthz|/readyz|/livez|/metrics"}[1m]))
+                > 0.05
+            for: 1m
+            labels:
+              severity: critical
+              team: checkout
+              service: checkout
+              namespace: commerce
+            annotations:
+              summary: 'checkout is failing {{ $value | humanizePercentage }} of requests'
+              description: '{{ $value | humanizePercentage }} of checkout requests in namespace commerce returned a 5xx over the last minute (threshold 5%, held for 1m).'

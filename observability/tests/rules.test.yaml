@@ -1,0 +1,61 @@
+# promtool unit tests for the rules in values/prometheus-rules.yaml. scripts/check.sh renders the chart, writes the two rule
+# files Prometheus loads next to this file, and runs `promtool test rules`.
+rule_files:
+  - recording_rules.yml
+  - alerting_rules.yml
+evaluation_interval: 15s
+tests:
+  # 6 of every 66 checkout requests fail (9.1%): pending once the 1m rate has two samples, firing a minute later.
+  - interval: 15s
+    input_series:
+      - series: 'http_requests_total{namespace="commerce", app="checkout", version="1.0.0", handler="/v1/checkout", code="200"}'
+        values: '0+60x20'
+      - series: 'http_requests_total{namespace="commerce", app="checkout", version="1.0.0", handler="/v1/checkout", code="502"}'
+        values: '0+6x20'
+      # Probes are not part of the ratio.
+      - series: 'http_requests_total{namespace="commerce", app="checkout", version="1.0.0", handler="/healthz", code="200"}'
+        values: '0+600x20'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: CheckoutHighErrorRate
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: CheckoutHighErrorRate
+        exp_alerts:
+          - exp_labels:
+              alertname: CheckoutHighErrorRate
+              severity: critical
+              team: checkout
+              service: checkout
+              namespace: commerce
+            exp_annotations:
+              summary: 'checkout is failing 9.091% of requests'
+              description: '9.091% of checkout requests in namespace commerce returned a 5xx over the last minute (threshold 5%, held for 1m).'
+  # 1 in 61 (1.6%) stays under the threshold.
+  - interval: 15s
+    input_series:
+      - series: 'http_requests_total{namespace="commerce", app="checkout", handler="/v1/checkout", code="200"}'
+        values: '0+60x20'
+      - series: 'http_requests_total{namespace="commerce", app="checkout", handler="/v1/checkout", code="500"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: CheckoutHighErrorRate
+        exp_alerts: []
+  # The per-version ratio is 0, not absent, for a version with no 5xx.
+  - interval: 15s
+    input_series:
+      - series: 'http_requests_total{namespace="commerce", app="payments", version="2.13.0", handler="/v1/charge", code="200"}'
+        values: '0+30x8'
+      - series: 'http_requests_total{namespace="commerce", app="payments", version="2.14.0", handler="/v1/charge", code="200"}'
+        values: '0+30x8'
+      - series: 'http_requests_total{namespace="commerce", app="payments", version="2.14.0", handler="/v1/charge", code="500"}'
+        values: '0+10x8'
+    promql_expr_test:
+      - expr: namespace_app_version:http_requests_5xx:ratio_rate1m
+        eval_time: 2m
+        exp_samples:
+          - labels: 'namespace_app_version:http_requests_5xx:ratio_rate1m{namespace="commerce", app="payments", version="2.13.0"}'
+            value: 0
+          - labels: 'namespace_app_version:http_requests_5xx:ratio_rate1m{namespace="commerce", app="payments", version="2.14.0"}'
+            value: 0.25
