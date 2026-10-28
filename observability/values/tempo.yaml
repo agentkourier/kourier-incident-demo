@@ -19,10 +19,14 @@ tempo:
     processor:
       span_metrics:
         dimensions: [service.version]
+      # TraceQL metrics (query_range, the agents' version split) need local blocks. Keep every span kind, so that
+      # structural queries such as {checkout error} >> {payments server} see the whole trace.
+      local_blocks:
+        filter_server_spans: false
   overrides:
     defaults:
       metrics_generator:
-        processors: [service-graphs, span-metrics]
+        processors: [service-graphs, span-metrics, local-blocks]
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {cpu: "1", memory: 512Mi}
