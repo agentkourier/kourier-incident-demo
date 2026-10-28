@@ -1,0 +1,27 @@
+# Example of the workspace-specific Slack IDs the pager and slackread servers need. Copy it to
+# slack-ids.yaml (gitignored), put your workspace's IDs in, and load it into the cluster as the
+# Secret demo-slack-ids (key slack-ids.yaml), for example:
+#
+#   kubectl -n demo-tools create secret generic demo-slack-ids --from-file=slack-ids.yaml
+#
+# Every value below is a placeholder. IDs must be upper-case letters and digits, as Slack issues them.
+
+# Team name (a Group in the catalog) to the IDs used when paging it.
+teams:
+  payments:
+    channel_id: C0REPLACEME1        # the #payments-oncall channel
+    oncall_group_id: S0REPLACEME1   # the payments on-call user group (mentioned as <!subteam^...>)
+    primary_user_id: U0REPLACEME1   # Dana
+    secondary_user_id: U0REPLACEME2 # Lee
+  checkout:
+    channel_id: C0REPLACEME2        # the #checkout-alerts channel
+    oncall_group_id: S0REPLACEME2
+    primary_user_id: U0REPLACEME3   # Priya
+    # secondary_user_id is optional; without it the page has no escalation line.
+
+# Channel name to channel ID, for the slackread server. Only names also given in its
+# --channels flag can be read.
+channels:
+  checkout-alerts: C0REPLACEME2
+  payments-oncall: C0REPLACEME1
+  incidents: C0REPLACEME3

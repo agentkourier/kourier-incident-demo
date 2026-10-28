@@ -1,0 +1,33 @@
+# Backstage-style Component entities for the demo services. The catalog MCP server reads every
+# *.yaml file in this directory; one file may hold several documents.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payments
+  title: Payments API
+  description: Authorises and captures card payments for checkout.
+  annotations:
+    github.com/project-slug: agentkourier/demo-payments
+    demo.agentkourier.dev/tier: tier-1
+spec:
+  type: service
+  lifecycle: production
+  owner: group:payments
+  system: commerce
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: checkout
+  title: Checkout
+  description: Turns a cart into an order; calls payments to charge the customer.
+  annotations:
+    github.com/project-slug: agentkourier/demo-checkout
+    demo.agentkourier.dev/tier: tier-1
+spec:
+  type: service
+  lifecycle: production
+  owner: group:checkout
+  system: commerce
+  dependsOn:
+    - component:payments

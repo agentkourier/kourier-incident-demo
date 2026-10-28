@@ -1,0 +1,30 @@
+# Backstage-style Group entities for the demo teams. Slack channel and on-call names only:
+# workspace IDs live in slack-ids.yaml, which is not committed (see slack-ids.example.yaml).
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: payments
+  description: Owns the payments service.
+  annotations:
+    demo.agentkourier.dev/slack-channel: "#payments-oncall"
+    demo.agentkourier.dev/oncall-primary: Dana
+    demo.agentkourier.dev/oncall-secondary: Lee
+spec:
+  type: team
+  profile:
+    displayName: Payments Team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: checkout
+  description: Owns the checkout service.
+  annotations:
+    demo.agentkourier.dev/slack-channel: "#checkout-alerts"
+    demo.agentkourier.dev/oncall-primary: Priya
+spec:
+  type: team
+  profile:
+    displayName: Checkout Team
+  children: []
