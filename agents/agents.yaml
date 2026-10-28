@@ -2,14 +2,14 @@
 # ModelConfig sandbox-model, its read-only Kubernetes tool server sandbox-tools and its Substrate worker pool.
 # requireApproval applies to a whole tool binding, so tools that change something get a binding of their own. The
 # only one left is payments-sre's rollback_deployment.
-# The demo's model: the sandbox's OpenRouter key and endpoint, with a model that follows "no text between tool
-# calls" (Haiku 4.5 narrated its steps into every message).
+# The demo's model, on the sandbox's OpenRouter key and endpoint. Its own ModelConfig so the demo can change model
+# without changing the sandbox's. Haiku 4.5 narrates between tool calls despite the prompts; a larger model may not.
 apiVersion: api.kagent.dev/v1alpha3
 kind: ModelConfig
 metadata: {name: demo-model, namespace: kagent}
 spec:
   provider: OpenAI
-  model: anthropic/claude-sonnet-5.5
+  model: anthropic/claude-haiku-4.5
   apiKeySecret: sandbox-model
   apiKeySecretKey: apiKey
   openAI:

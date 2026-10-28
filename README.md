@@ -10,7 +10,7 @@ decodes `amount` as `int64`, so every response from v2.14.0 fails in checkout wh
 |---|---|---|---|---|---|
 | checkout-assist | `#checkout-alerts` | `checkout-sre` | Alertmanager's `CheckoutHighErrorRate` post, or a mention | investigates; escalates to `#incidents` when the escalation tool's evidence check passes, or asks the checkout on-call | nothing |
 | incident-commander | `#incidents` | `incident-commander` | Pager's escalation or resolved post, or a mention | declares the incident, pages the owning team, writes the summary | nothing |
-| Agent Kourier (payments) | `#payments-ops` | `payments-sre` | the Pager's page, or a mention | confirms the cause, proposes the rollback | the rollback: a member of the payments user group approves |
+| payments-assist | `#payments-ops` | `payments-sre` | the Pager's page, or a mention | confirms the cause, proposes the rollback | the rollback: a member of the payments user group approves |
 
 ## How the incident plays out
 
@@ -40,7 +40,7 @@ thresholds are this demo's policy, and the third check only knows the checkout �
 
 ### The one approval
 
-**`rollback_deployment`** (payments bot, `#payments-ops`): only `@payments-team` can approve, and Agent Kourier, not
+**`rollback_deployment`** (payments-assist, `#payments-ops`): only `@payments-team` can approve, and Agent Kourier, not
 the prompt, enforces it. Anyone else's press is refused with "Only approvers of this Binding can decide this
 request." and audited. incident-commander's Binding has approvals off, so any approval request from it is denied.
 
@@ -52,7 +52,7 @@ sequenceDiagram
     participant ES as escalation tool
     participant IC as incident-commander
     participant PG as Pager
-    participant PA as payments bot<br/>(Agent Kourier)
+    participant PA as payments-assist
     actor Dana as Dana<br/>payments on-call
     participant Pay as payments<br/>Deployment
 
@@ -63,7 +63,7 @@ sequenceDiagram
     ES->>IC: Escalation · checkout failing (posted by Pager in #incidents)
     IC->>PG: page_team(payments, SEV2)
     PG->>Dana: SEV2 for @payments-oncall → paging @Dana
-    PG->>PA: the page post starts the payments bot
+    PG->>PA: the page post starts payments-assist
     PA-->>Dana: cause confirmed, rollback to revision 1 needs approval
     Note over Dana,PA: approval: @payments-team only
     Dana->>PA: Approve
@@ -103,12 +103,12 @@ scripts/          rollout, reset, heal
   `AGENT_KOURIER_CHECKOUT` points at that checkout (default `../agent-courier`), for the Helm chart.
 - Images built and loaded into kind: `demo-payments:v2.13.0`, `demo-payments:v2.14.0` and `demo-checkout:v1.8.0`
   (`make image VERSION=…` in the service repos at their tags), then `make images` here.
-- Three more Slack apps besides the sandbox's: checkout-assist and incident-commander (Socket Mode, the sandbox
-  app's scopes), and Pager (`chat:write`, `chat:write.public`). Their tokens are in
-  `~/.config/agent-kourier/demo-checkout-assist.env`, `demo-incident-commander.env` (`SLACK_BOT_TOKEN`,
-  `SLACK_APP_TOKEN`) and `demo-pager.env` (`SLACK_BOT_TOKEN`), mode 600.
+- Four Slack apps: checkout-assist, incident-commander and payments-assist (Socket Mode, the sandbox app's scopes),
+  and Pager (`chat:write`, `chat:write.public`). Their tokens are in `~/.config/agent-kourier/demo-checkout-assist.env`,
+  `demo-incident-commander.env`, `demo-payments-assist.env` (`SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`) and
+  `demo-pager.env` (`SLACK_BOT_TOKEN`), mode 600.
 - Slack channels and members. `#checkout-alerts`: Priya, checkout-assist. `#incidents`: everyone, incident-commander.
-  `#payments-ops`: Priya, Dana, Lee, the payments bot. incident-commander must also be a member of `#checkout-alerts`
+  `#payments-ops`: Priya, Dana, Lee, payments-assist. incident-commander must also be a member of `#checkout-alerts`
   and `#payments-ops`, or `read_thread` and `read_recent` fail with `not_in_channel` and it can't see what the other
   agents found; its Binding still listens only in `#incidents`. Pager posts pages in `#payments-ops`, escalations and
   resolutions in `#incidents`, and questions in `#checkout-alerts` threads; it needs no membership
@@ -132,9 +132,6 @@ scripts/          rollout, reset, heal
 make up            # observability, tools, agents, commerce, the three releases
 make rollout-bad   # payments v2.14.0: checkout fails, CheckoutHighErrorRate fires about 2 minutes later
 make reset         # payments back on v2.13.0 with a clean history, between takes
-make down          # remove the demo and give the payments Slack app back to the sandbox release
+make down          # remove the demo
 make heal          # after a Docker or node restart, if every agent turn says "input was not accepted"
 ```
-
-`make kourier` scales the tier's `agent-kourier-sandbox` release to 0, because the payments bot is the sandbox's
-Slack app and two Socket Mode connections on one app split its events. `make down` scales it back to 1.

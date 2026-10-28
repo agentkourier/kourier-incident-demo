@@ -2,9 +2,7 @@
 # Install or update the demo's three Agent Kourier releases in namespace agent-kourier on the kind full tier:
 #   agent-kourier-demo-checkout  checkout-assist     (Slack app tokens: ~/.config/agent-kourier/demo-checkout-assist.env)
 #   agent-kourier-demo-ic        incident-commander  (~/.config/agent-kourier/demo-incident-commander.env)
-#   agent-kourier-demo-payments  Agent Kourier app   (~/.config/agent-kourier/sandbox.env, shared with the tier's sandbox)
-# The payments release shares its Slack app with the tier's sandbox release, so this scales agent-kourier-sandbox to 0
-# (two Socket Mode connections on one app would split the events); down.sh scales it back.
+#   agent-kourier-demo-payments  payments-assist     (~/.config/agent-kourier/demo-payments-assist.env)
 # Needs AGENT_KOURIER_CHECKOUT (an agent-kourier checkout, for the chart). Never prints a token.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
@@ -34,14 +32,9 @@ print(json.dumps({"apiVersion":"v1","kind":"Secret","metadata":{"name":name,"nam
 PY
 }
 
-if "${K[@]}" get deploy/agent-kourier-sandbox >/dev/null 2>&1; then
-  echo "scaling the tier's agent-kourier-sandbox to 0 (it shares the payments Slack app)"
-  "${K[@]}" scale deploy/agent-kourier-sandbox --replicas=0 >/dev/null
-fi
-
 # Per release: its Slack app's token file, and one of the full tier's Dex test users (hack/kind/full/dex.yaml), so
 # that kagent keeps each release's sessions apart.
-app_file() { case $1 in checkout) echo demo-checkout-assist.env ;; ic) echo demo-incident-commander.env ;; payments) echo sandbox.env ;; esac; }
+app_file() { case $1 in checkout) echo demo-checkout-assist.env ;; ic) echo demo-incident-commander.env ;; payments) echo demo-payments-assist.env ;; esac; }
 dex_user() { case $1 in checkout) echo binding-test@example.test ;; ic) echo identity-b@example.test ;; payments) echo svc-sre-alerts@example.test ;; esac; }
 for name in checkout ic payments; do
   rel=agent-kourier-demo-$name

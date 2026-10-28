@@ -30,10 +30,10 @@ agents: ## The three kagent agents and their prompts
 commerce: ## payments v2.13.0, checkout and loadgen
 	scripts/reset.sh
 
-kourier: ## The three Agent Kourier releases (scales the tier's sandbox release to 0)
+kourier: ## The three Agent Kourier releases
 	deploy/kourier/install.sh
 
-down: ## Remove the releases, agents, tools and services; give the Slack app back to the sandbox (observability stays)
+down: ## Remove the releases, agents, tools and services (observability stays)
 	deploy/kourier/down.sh
 	-$(K) delete -f agents/agents.yaml -f agents/prompts.yaml --ignore-not-found
 	-$(K) delete -k mcp/deploy --ignore-not-found
