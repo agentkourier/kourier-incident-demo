@@ -1,0 +1,9 @@
+{
+  "capturedAt": "2026-10-28T17:01:15Z",
+  "alertmanager": "monitoring/agent-kourier",
+  "spec": {
+    "configSecret": null,
+    "secrets": null,
+    "externalUrl": null
+  }
+}

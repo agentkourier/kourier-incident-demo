@@ -1,0 +1,48 @@
+# The base configuration of the cluster's Alertmanager (monitoring/agent-kourier, run by prometheus-operator) for the demo: it
+# posts CheckoutHighErrorRate, and any critical alert of team checkout, to the Slack channel #checkout-alerts through an incoming
+# webhook. install.sh puts this file in the Secret monitoring/alertmanager-demo-config and names that Secret as the Alertmanager's
+# configSecret.
+#
+# The same pattern as the agent-kourier sandbox's alert source (hack/kind/sandbox/alertmanager/config.yaml in that repo), for the
+# same reasons: an AlertmanagerConfig resource cannot say api_url_file (the operator would write the URL into the generated
+# configuration), and the operator adds a namespace matcher to a resource's routes. The webhook URL is not here: api_url_file
+# reads it from the Secret monitoring/demo-checkout-alerts-slack (key webhook-url) that install.sh makes from
+# ~/.config/agent-kourier/demo-checkout-alerts-webhook-url, mounted by the Alertmanager's `secrets`.
+#
+# The operator does not change these routes. It puts the routes of the cluster's AlertmanagerConfig resources (monitoring/sink,
+# the e2e tests' webhook sink, which has continue: true) in front of them, so every alert still reaches the sink first.
+#
+# Without the webhook file, install.sh applies this configuration with the checkout-alerts receiver's slack_configs removed:
+# the routes are in place and visible in the Alertmanager, and nothing is posted.
+global:
+  resolve_timeout: 5m
+route:
+  receiver: "null"
+  group_by: ["alertname", "namespace"]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 4h
+  routes:
+    - receiver: checkout-alerts
+      matchers:
+        - alertname="CheckoutHighErrorRate"
+    - receiver: checkout-alerts
+      matchers:
+        - team="checkout"
+        - severity="critical"
+receivers:
+  - name: "null"
+  - name: checkout-alerts
+    slack_configs:
+      - api_url_file: /etc/alertmanager/secrets/demo-checkout-alerts-slack/webhook-url
+        channel: "#checkout-alerts"
+        send_resolved: true
+        # Agent Kourier's trigger matches "FIRING (<n>) - <alertname>" and "RESOLVED - <alertname>". The title_link is the
+        # default, <externalUrl>/#/alerts?receiver=checkout-alerts, which carries the receiver's name.
+        title: '{{ .Status | toUpper }}{{ if eq .Status "firing" }} ({{ .Alerts.Firing | len }}){{ end }} - {{ .CommonLabels.alertname }}'
+        text: >-
+          {{ range .Alerts }}
+          *{{ .Labels.alertname }}* - {{ .Labels.severity }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}

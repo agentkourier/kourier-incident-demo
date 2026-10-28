@@ -1,0 +1,92 @@
+# prometheus-community/prometheus 29.39.0, release "prometheus" in namespace observability.
+# Server and kube-state-metrics only: no node-exporter, pushgateway or bundled Alertmanager, and no volume.
+# Alerts go to the cluster's operator-managed Alertmanager (monitoring/agent-kourier). The rules are in prometheus-rules.yaml.
+alertmanager: {enabled: false}
+prometheus-node-exporter: {enabled: false}
+prometheus-pushgateway: {enabled: false}
+
+server:
+  persistentVolume: {enabled: false}
+  retention: 6h
+  global:
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    evaluation_interval: 15s
+  extraFlags:
+    - web.enable-lifecycle # the configmap-reload sidecar posts to /-/reload
+    - web.enable-remote-write-receiver # Tempo's metrics generator writes service-graph and span metrics here
+  # prometheus-operator's headless Service for the Alertmanager it runs (monitoring/agent-kourier). The fast tier's ClusterIP
+  # Service monitoring/alertmanager selects the same pod; the operated one exists whatever the tier does.
+  alertmanagers:
+    - api_version: v2
+      static_configs:
+        - targets: ["alertmanager-operated.monitoring.svc:9093"]
+  resources:
+    requests: {cpu: 100m, memory: 192Mi}
+    limits: {cpu: "1", memory: 512Mi}
+
+configmapReload:
+  prometheus:
+    resources:
+      requests: {cpu: 5m, memory: 16Mi}
+      limits: {cpu: 50m, memory: 64Mi}
+
+kube-state-metrics:
+  # Only what the demo looks at: rollouts and pods.
+  collectors: [deployments, replicasets, pods, namespaces, nodes]
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {cpu: 200m, memory: 128Mi}
+
+# The chart's cluster-wide default jobs are off; these are the jobs, each with a known target.
+scrapeConfigs:
+  kubernetes-api-servers: {enabled: false}
+  kubernetes-nodes: {enabled: false}
+  kubernetes-nodes-cadvisor: {enabled: false}
+  kubernetes-service-endpoints: {enabled: false}
+  kubernetes-service-endpoints-slow: {enabled: false}
+  prometheus-pushgateway: {enabled: false}
+  kubernetes-services: {enabled: false}
+  kubernetes-pods: {enabled: false}
+  kubernetes-pods-slow: {enabled: false}
+  kube-state-metrics:
+    static_configs:
+      - targets: ["prometheus-kube-state-metrics.observability.svc:8080"]
+  tempo:
+    static_configs:
+      - targets: ["tempo.observability.svc:3200"]
+  otel-collector:
+    static_configs:
+      - targets: ["otel-collector.observability.svc:8888"]
+  # The demo services: every pod in namespace commerce that is part of commerce, on :8080/metrics, whether or not its
+  # container declares the port. Labels: namespace, pod, app (app.kubernetes.io/name), version (app.kubernetes.io/version).
+  commerce:
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: {names: [commerce]}
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_part_of]
+        regex: commerce
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_phase]
+        regex: Pending|Succeeded|Failed
+        action: drop
+      - source_labels: [__meta_kubernetes_pod_container_init]
+        regex: "true"
+        action: drop
+      # One target per pod: the container port 8080, or a container that declares no port.
+      - source_labels: [__meta_kubernetes_pod_container_port_number]
+        regex: "8080|"
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_ip]
+        regex: (.+)
+        replacement: "$1:8080"
+        target_label: __address__
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        target_label: app
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_version]
+        target_label: version
