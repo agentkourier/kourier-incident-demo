@@ -20,7 +20,7 @@ import (
 // connect serves c's server over Streamable HTTP on a local port and returns a client session.
 func connect(t *testing.T, c config) (*mcp.ClientSession, string) {
 	t.Helper()
-	s, err := newServer(c)
+	s, err := newServer(context.Background(), c, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatalf("newServer: %v", err)
 	}
@@ -163,10 +163,10 @@ func TestPagerOverStreamableHTTP(t *testing.T) {
 }
 
 func TestNewServerRejectsUnknown(t *testing.T) {
-	if _, err := newServer(config{server: "shell"}); err == nil {
+	if _, err := newServer(context.Background(), config{server: "shell"}, slog.New(slog.DiscardHandler)); err == nil {
 		t.Fatal("unknown --server accepted")
 	}
-	if _, err := newServer(config{server: "pager", catalogDir: "../../../catalog", slackIDs: "/nonexistent"}); err == nil {
+	if _, err := newServer(context.Background(), config{server: "pager", catalogDir: "../../../catalog", slackIDs: "/nonexistent"}, slog.New(slog.DiscardHandler)); err == nil {
 		t.Fatal("pager started without a slack-ids file")
 	}
 }

@@ -118,6 +118,13 @@ func TestPageWithoutSecondaryOrLink(t *testing.T) {
 	}
 }
 
+func TestPageTeamWithoutGroup(t *testing.T) {
+	ids := slackids.Team{ChannelID: "C0CHK", PrimaryUserID: "U0PRIYA"}
+	if got, want := Message(2, ids, "x", ""), "SEV2 → paging <@U0PRIYA> (primary on-call)\nx"; got != want {
+		t.Errorf("Message = %q, want %q", got, want)
+	}
+}
+
 func TestPageNeutralisesModelMarkup(t *testing.T) {
 	p, fake, _ := newTestPager(t)
 	out, err := p.Page(context.Background(), Input{

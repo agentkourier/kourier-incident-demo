@@ -1,5 +1,5 @@
 // Command demo-mcp runs one of the Agent Kourier incident demo's MCP tool servers over Streamable
-// HTTP: catalog, pager, rollout or slackread, chosen with --server.
+// HTTP: catalog, escalation, pager, rollout or slackread, chosen with --server.
 package main
 
 import (
@@ -21,8 +21,10 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/agentkourier/kourier-incident-demo/mcp/internal/catalog"
+	"github.com/agentkourier/kourier-incident-demo/mcp/internal/escalation"
 	"github.com/agentkourier/kourier-incident-demo/mcp/internal/mcpserve"
 	"github.com/agentkourier/kourier-incident-demo/mcp/internal/pager"
+	"github.com/agentkourier/kourier-incident-demo/mcp/internal/promapi"
 	"github.com/agentkourier/kourier-incident-demo/mcp/internal/rollout"
 	"github.com/agentkourier/kourier-incident-demo/mcp/internal/slackapi"
 	"github.com/agentkourier/kourier-incident-demo/mcp/internal/slackids"
@@ -45,6 +47,9 @@ type config struct {
 	allowedDeployments string
 	channels           string
 	timezone           string
+	prometheusURL      string
+	incidentsChannel   string
+	askChannels        string
 	slackToken         string
 }
 
@@ -52,15 +57,18 @@ func parseFlags(args []string, stderr io.Writer) (config, error) {
 	var c config
 	fs := flag.NewFlagSet("demo-mcp", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	fs.StringVar(&c.server, "server", "", "which server to run: catalog | pager | rollout | slackread")
+	fs.StringVar(&c.server, "server", "", "which server to run: catalog | escalation | pager | rollout | slackread")
 	fs.StringVar(&c.addr, "addr", ":8084", "listen address")
 	fs.StringVar(&c.catalogDir, "catalog-dir", "/catalog", "directory of Backstage-style catalog YAML (catalog, pager)")
 	fs.StringVar(&c.slackIDs, "slack-ids", "/etc/demo-slack-ids/slack-ids.yaml", "workspace Slack IDs file (pager, slackread)")
 	fs.StringVar(&c.slackAPI, "slack-api-url", slackapi.DefaultBaseURL, "Slack Web API base URL (pager, slackread)")
-	fs.StringVar(&c.allowedNamespace, "allowed-namespace", "commerce", "the only namespace the rollout tools touch (rollout)")
+	fs.StringVar(&c.allowedNamespace, "allowed-namespace", "commerce", "the only namespace the rollout and escalation tools read (rollout, escalation)")
 	fs.StringVar(&c.allowedDeployments, "allowed-deployments", "payments", "comma-separated deployments that may be rolled back (rollout)")
 	fs.StringVar(&c.channels, "channels", "checkout-alerts,payments-ops,incidents", "comma-separated channel names that may be read (slackread)")
 	fs.StringVar(&c.timezone, "tz", "UTC", "IANA time zone for message times (slackread)")
+	fs.StringVar(&c.prometheusURL, "prometheus-url", "http://prometheus-server.observability.svc", "Prometheus base URL (escalation)")
+	fs.StringVar(&c.incidentsChannel, "incidents-channel", "incidents", "channel name escalations and resolutions are posted to (escalation)")
+	fs.StringVar(&c.askChannels, "ask-channels", "checkout-alerts", "comma-separated channel names ask_oncall may reply in (escalation)")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	if err := fs.Parse(args); err != nil {
 		return c, err
@@ -73,8 +81,9 @@ func parseFlags(args []string, stderr io.Writer) (config, error) {
 	return c, nil
 }
 
-// newServer builds the MCP server the config selects.
-func newServer(c config) (*mcp.Server, error) {
+// newServer builds the MCP server the config selects. ctx bounds background work (the escalation
+// server's recovery watchers).
+func newServer(ctx context.Context, c config, logger *slog.Logger) (*mcp.Server, error) {
 	s := mcp.NewServer(&mcp.Implementation{Name: "demo-mcp-" + c.server, Version: version}, nil)
 	switch c.server {
 	case "catalog":
@@ -99,14 +108,41 @@ func newServer(c config) (*mcp.Server, error) {
 		if err := pager.Register(s, p); err != nil {
 			return nil, err
 		}
+	case "escalation":
+		cat, err := catalog.Load(c.catalogDir)
+		if err != nil {
+			return nil, err
+		}
+		ids, err := slackids.Load(c.slackIDs)
+		if err != nil {
+			return nil, err
+		}
+		if c.slackToken == "" {
+			return nil, fmt.Errorf("%s is not set", tokenEnv)
+		}
+		cs, err := inCluster()
+		if err != nil {
+			return nil, err
+		}
+		e, err := escalation.New(ctx, escalation.Config{
+			Namespace:        c.allowedNamespace,
+			IncidentsChannel: c.incidentsChannel,
+			AskChannels:      strings.Split(c.askChannels, ","),
+			Logger:           logger,
+		}, cat, ids, slackapi.New(c.slackAPI, c.slackToken, nil), promapi.New(c.prometheusURL, nil), cs)
+		if err != nil {
+			return nil, err
+		}
+		if err := escalation.Register(s, e); err != nil {
+			return nil, err
+		}
 	case "rollout":
-		rc, err := rest.InClusterConfig()
+		cs, err := inCluster()
+		if err != nil {
+			return nil, err
+		}
 		if err != nil {
 			return nil, fmt.Errorf("in-cluster config: %w", err)
-		}
-		cs, err := kubernetes.NewForConfig(rc)
-		if err != nil {
-			return nil, fmt.Errorf("kubernetes client: %w", err)
 		}
 		if err := rollout.Register(s, rollout.New(cs, c.allowedNamespace, strings.Split(c.allowedDeployments, ","))); err != nil {
 			return nil, err
@@ -131,9 +167,22 @@ func newServer(c config) (*mcp.Server, error) {
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("--server must be catalog, pager, rollout or slackread, got %q", c.server)
+		return nil, fmt.Errorf("--server must be catalog, escalation, pager, rollout or slackread, got %q", c.server)
 	}
 	return s, nil
+}
+
+// inCluster returns a Kubernetes client from the pod's service account.
+func inCluster() (kubernetes.Interface, error) {
+	rc, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("in-cluster config: %w", err)
+	}
+	cs, err := kubernetes.NewForConfig(rc)
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes client: %w", err)
+	}
+	return cs, nil
 }
 
 func run(ctx context.Context, args []string, stderr io.Writer) error {
@@ -142,7 +191,7 @@ func run(ctx context.Context, args []string, stderr io.Writer) error {
 		return err
 	}
 	logger := slog.New(slog.NewJSONHandler(stderr, nil)).With("server", c.server)
-	s, err := newServer(c)
+	s, err := newServer(ctx, c, logger)
 	if err != nil {
 		return err
 	}

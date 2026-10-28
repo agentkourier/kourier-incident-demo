@@ -15,8 +15,8 @@ import (
 type Team struct {
 	// ChannelID is the channel pages are posted to.
 	ChannelID string `json:"channel_id"`
-	// OncallGroupID is the user group mentioned in the page.
-	OncallGroupID string `json:"oncall_group_id"`
+	// OncallGroupID is the user group mentioned in the page, if the team has one.
+	OncallGroupID string `json:"oncall_group_id,omitempty"`
 	// PrimaryUserID is the primary on-call person.
 	PrimaryUserID string `json:"primary_user_id"`
 	// SecondaryUserID is the secondary on-call person; empty when the team has none.
@@ -61,13 +61,15 @@ func (c *Config) validate() error {
 		t := c.Teams[name]
 		required := map[string]string{
 			"channel_id":      t.ChannelID,
-			"oncall_group_id": t.OncallGroupID,
 			"primary_user_id": t.PrimaryUserID,
 		}
 		for _, field := range sortedKeys(required) {
 			if !idPattern.MatchString(required[field]) {
 				return fmt.Errorf("team %q: %s %q is not a Slack ID", name, field, required[field])
 			}
+		}
+		if t.OncallGroupID != "" && !idPattern.MatchString(t.OncallGroupID) {
+			return fmt.Errorf("team %q: oncall_group_id %q is not a Slack ID", name, t.OncallGroupID)
 		}
 		if t.SecondaryUserID != "" && !idPattern.MatchString(t.SecondaryUserID) {
 			return fmt.Errorf("team %q: secondary_user_id %q is not a Slack ID", name, t.SecondaryUserID)

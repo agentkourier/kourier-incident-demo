@@ -22,10 +22,21 @@ func TestExampleFileParses(t *testing.T) {
 	}
 }
 
+func TestParseGroupIsOptional(t *testing.T) {
+	cfg, err := Parse([]byte("teams: {checkout: {channel_id: C1, primary_user_id: U1}}"))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := cfg.Teams["checkout"]; got.OncallGroupID != "" || got.PrimaryUserID != "U1" {
+		t.Errorf("checkout = %+v", got)
+	}
+}
+
 func TestParseRejects(t *testing.T) {
 	tests := map[string]string{
 		"markup in an ID":   "teams: {p: {channel_id: C1, oncall_group_id: S1, primary_user_id: 'U1> <!channel'}}",
-		"missing group":     "teams: {p: {channel_id: C1, primary_user_id: U1}}",
+		"missing primary":   "teams: {p: {channel_id: C1, oncall_group_id: S1}}",
+		"bad group":         "teams: {p: {channel_id: C1, oncall_group_id: '<!channel>', primary_user_id: U1}}",
 		"lower-case ID":     "teams: {p: {channel_id: c1, oncall_group_id: S1, primary_user_id: U1}}",
 		"bad secondary":     "teams: {p: {channel_id: C1, oncall_group_id: S1, primary_user_id: U1, secondary_user_id: '<@U2>'}}",
 		"bad channel":       "channels: {incidents: '#incidents'}",

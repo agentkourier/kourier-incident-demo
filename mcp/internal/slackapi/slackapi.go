@@ -113,6 +113,38 @@ func (c *Client) PostMessage(ctx context.Context, channel, text string) (string,
 	return resp.TS, nil
 }
 
+// PostReply posts text as a reply in the thread threadTS of channel and returns its ts, with the
+// same parsing rules as PostMessage.
+func (c *Client) PostReply(ctx context.Context, channel, threadTS, text string) (string, error) {
+	form := url.Values{
+		"channel":      {channel},
+		"thread_ts":    {threadTS},
+		"text":         {text},
+		"parse":        {"none"},
+		"link_names":   {"false"},
+		"unfurl_links": {"false"},
+		"unfurl_media": {"false"},
+	}
+	var resp struct {
+		TS string `json:"ts"`
+	}
+	if err := c.call(ctx, "chat.postMessage", form, &resp); err != nil {
+		return "", err
+	}
+	return resp.TS, nil
+}
+
+// Permalink returns the permanent link of message ts in channel.
+func (c *Client) Permalink(ctx context.Context, channel, ts string) (string, error) {
+	var resp struct {
+		Permalink string `json:"permalink"`
+	}
+	if err := c.call(ctx, "chat.getPermalink", url.Values{"channel": {channel}, "message_ts": {ts}}, &resp); err != nil {
+		return "", err
+	}
+	return resp.Permalink, nil
+}
+
 // Page is one page of messages and the cursor for the next (empty when there is none).
 type Page struct {
 	Messages   []Message

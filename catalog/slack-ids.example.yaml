@@ -15,8 +15,8 @@ teams:
     secondary_user_id: U0REPLACEME2 # Lee
   checkout:
     channel_id: C0REPLACEME2        # the #checkout-alerts channel
-    oncall_group_id: S0REPLACEME2
     primary_user_id: U0REPLACEME3   # Priya
+    # oncall_group_id is optional; without it a page or question mentions the primary only.
     # secondary_user_id is optional; without it the page has no escalation line.
 
 # Channel name to channel ID, for the slackread server. Only names also given in its

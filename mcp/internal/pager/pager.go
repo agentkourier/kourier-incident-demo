@@ -132,7 +132,11 @@ func (p *Pager) release(team string) {
 // Message builds the page text. summary and link must already be cleaned.
 func Message(severity int, ids slackids.Team, summary, link string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "SEV%d for <!subteam^%s> → paging <@%s> (primary on-call)\n", severity, ids.OncallGroupID, ids.PrimaryUserID)
+	if ids.OncallGroupID != "" {
+		fmt.Fprintf(&b, "SEV%d for <!subteam^%s> → paging <@%s> (primary on-call)\n", severity, ids.OncallGroupID, ids.PrimaryUserID)
+	} else {
+		fmt.Fprintf(&b, "SEV%d → paging <@%s> (primary on-call)\n", severity, ids.PrimaryUserID)
+	}
 	if ids.SecondaryUserID != "" {
 		fmt.Fprintf(&b, "Escalates to <@%s> (secondary) if not acknowledged in 5 min.\n", ids.SecondaryUserID)
 	}

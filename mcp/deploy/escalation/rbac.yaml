@@ -1,0 +1,35 @@
+# The escalation server's identity. Its only grant is this Role in namespace commerce: read
+# Deployments and ReplicaSets, to find when the suspected service last rolled out. Nothing
+# cluster-wide, and no write verbs.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: escalation-mcp
+  namespace: demo-tools
+  labels: {app.kubernetes.io/name: escalation-mcp}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: escalation-mcp
+  namespace: commerce
+  labels: {app.kubernetes.io/name: escalation-mcp, app.kubernetes.io/part-of: kourier-incident-demo}
+rules:
+  - apiGroups: [apps]
+    resources: [deployments, replicasets]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: escalation-mcp
+  namespace: commerce
+  labels: {app.kubernetes.io/name: escalation-mcp, app.kubernetes.io/part-of: kourier-incident-demo}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: escalation-mcp
+subjects:
+  - kind: ServiceAccount
+    name: escalation-mcp
+    namespace: demo-tools

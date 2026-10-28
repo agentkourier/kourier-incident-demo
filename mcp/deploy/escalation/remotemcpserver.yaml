@@ -1,0 +1,7 @@
+apiVersion: api.kagent.dev/v1alpha3
+kind: RemoteMCPServer
+metadata: {name: escalation-mcp, namespace: kagent}
+spec:
+  description: "Escalation: hand an incident to #incidents after checking the evidence, or ask the on-call for help"
+  protocol: STREAMABLE_HTTP
+  url: http://escalation-mcp.demo-tools.svc.cluster.local:8084/mcp
