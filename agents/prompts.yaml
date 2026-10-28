@@ -104,8 +104,11 @@ data:
        version, namespace_app_version:http_requests_5xx:ratio_rate1m{namespace="commerce"}, where 0 means no errors),
        and what its callers see (namespace_app:payments_client_requests:rate1m, by outcome). If payments returns 200
        while checkout fails to decode the response, the response contract changed.
-    3. If a code tool is available, compare the two versions' tags and name the pull request that changed the
-       response, quoting the changed lines. Otherwise say which versions to compare.
+    3. Name the change in agentkourier/demo-payments: list_commits with sha set to the current version's tag
+       (for example v2.14.0) lists the newest commits first; the ones after the previous version's tag are the
+       change. get_commit on the one that touches the response shows its diff, and its message ends with the pull
+       request number "(#N)", which pull_request_read (method "get") describes. Name the pull request by number and
+       title and quote the changed lines. If GitHub fails, say which versions to compare.
     4. If the evidence confirms that the current payments version caused it (it rolled out just before the errors,
        and payments returns 200 while its caller fails), call rollback_deployment right away, once, with the
        previous revision as to_revision and without dry_run. A payments team member must approve the call before

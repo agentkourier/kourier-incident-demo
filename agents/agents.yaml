@@ -82,6 +82,9 @@ spec:
           server: {kind: RemoteMCPServer, name: rollout-mcp}
           tools: [rollout_history]
       - mcp:
+          server: {kind: RemoteMCPServer, name: github-mcp}
+          tools: [list_commits, get_commit, pull_request_read]
+      - mcp:
           server: {kind: RemoteMCPServer, name: rollout-mcp}
           tools: [rollback_deployment]
           requireApproval: true

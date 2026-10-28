@@ -120,6 +120,9 @@ scripts/          rollout, reset, heal
 - Workspace IDs, which are not committed: `catalog/slack-ids.yaml` (from `slack-ids.example.yaml`) and
   `deploy/kourier/ids.env` (from `ids.example.env`). Load the first and the two bot tokens as Secrets in
   `demo-tools`; see the comment at the top of `mcp/deploy/kustomization.yaml`.
+- A GitHub token that can read the two service repos (a fine-grained token with public-repository read access is
+  enough), in Secret `kagent/demo-github-token`, key `token`, value `Bearer <token>`. The GitHub MCP server sends it
+  on every call; without it the payments agent can't name the pull request.
 - For Alertmanager to post to `#checkout-alerts`: an incoming-webhook URL in
   `~/.config/agent-kourier/demo-checkout-alerts-webhook-url`, then `observability/install.sh` again.
 
@@ -135,7 +138,3 @@ make heal          # after a Docker or node restart, if every agent turn says "i
 
 `make kourier` scales the tier's `agent-kourier-sandbox` release to 0, because the payments bot is the sandbox's
 Slack app and two Socket Mode connections on one app split its events. `make down` scales it back to 1.
-
-The GitHub MCP server is deployed at zero replicas. To let the payments agent read the diff, put a read-only token
-for the two service repos in Secret `kagent/demo-github-token` (key `token`, value `Bearer <token>`), scale
-`demo-tools/github-mcp` to 1, and bind `github-mcp` in `agents/agents.yaml`.
