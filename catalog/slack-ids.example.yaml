@@ -9,7 +9,7 @@
 # Team name (a Group in the catalog) to the IDs used when paging it.
 teams:
   payments:
-    channel_id: C0REPLACEME1        # the #payments-oncall channel
+    channel_id: C0REPLACEME1        # the #payments-ops channel
     oncall_group_id: S0REPLACEME1   # the payments on-call user group (mentioned as <!subteam^...>)
     primary_user_id: U0REPLACEME1   # Dana
     secondary_user_id: U0REPLACEME2 # Lee
@@ -23,5 +23,5 @@ teams:
 # --channels flag can be read.
 channels:
   checkout-alerts: C0REPLACEME2
-  payments-oncall: C0REPLACEME1
+  payments-ops: C0REPLACEME1
   incidents: C0REPLACEME3

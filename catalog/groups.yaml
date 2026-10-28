@@ -6,7 +6,7 @@ metadata:
   name: payments
   description: Owns the payments service.
   annotations:
-    demo.agentkourier.dev/slack-channel: "#payments-oncall"
+    demo.agentkourier.dev/slack-channel: "#payments-ops"
     demo.agentkourier.dev/oncall-primary: Dana
     demo.agentkourier.dev/oncall-secondary: Lee
 spec:

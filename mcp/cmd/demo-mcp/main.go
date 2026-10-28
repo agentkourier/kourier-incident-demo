@@ -59,7 +59,7 @@ func parseFlags(args []string, stderr io.Writer) (config, error) {
 	fs.StringVar(&c.slackAPI, "slack-api-url", slackapi.DefaultBaseURL, "Slack Web API base URL (pager, slackread)")
 	fs.StringVar(&c.allowedNamespace, "allowed-namespace", "commerce", "the only namespace the rollout tools touch (rollout)")
 	fs.StringVar(&c.allowedDeployments, "allowed-deployments", "payments", "comma-separated deployments that may be rolled back (rollout)")
-	fs.StringVar(&c.channels, "channels", "checkout-alerts,payments-oncall,incidents", "comma-separated channel names that may be read (slackread)")
+	fs.StringVar(&c.channels, "channels", "checkout-alerts,payments-ops,incidents", "comma-separated channel names that may be read (slackread)")
 	fs.StringVar(&c.timezone, "tz", "UTC", "IANA time zone for message times (slackread)")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	if err := fs.Parse(args); err != nil {

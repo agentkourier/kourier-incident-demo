@@ -22,7 +22,7 @@ func TestLoadRepoCatalog(t *testing.T) {
 	}{
 		{"payments", Service{
 			Service: "payments", System: "commerce", Team: "payments", TeamDisplayName: "Payments Team",
-			SlackChannel: "#payments-oncall", OncallPrimary: "Dana", OncallSecondary: "Lee",
+			SlackChannel: "#payments-ops", OncallPrimary: "Dana", OncallSecondary: "Lee",
 			Repo: "agentkourier/demo-payments", Tier: "tier-1",
 		}},
 		{" Checkout ", Service{

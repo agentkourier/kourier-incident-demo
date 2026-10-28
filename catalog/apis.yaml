@@ -1,0 +1,21 @@
+# Backstage-style API entity for the payments contract that checkout consumes. The catalog MCP server
+# ignores kinds other than Component and Group; this entity keeps the catalog complete for Backstage.
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: payments-api
+  description: Card authorisation API served by payments and called by checkout.
+spec:
+  type: openapi
+  lifecycle: production
+  owner: group:payments
+  system: commerce
+  definition: |
+    openapi: 3.0.3
+    info: {title: Payments API, version: "2"}
+    paths:
+      /v1/authorize:
+        post:
+          summary: Authorise a payment for an order
+          responses:
+            "200": {description: Authorisation result}

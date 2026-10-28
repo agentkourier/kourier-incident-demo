@@ -14,6 +14,8 @@ spec:
   lifecycle: production
   owner: group:payments
   system: commerce
+  providesApis:
+    - payments-api
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
@@ -31,3 +33,5 @@ spec:
   system: commerce
   dependsOn:
     - component:payments
+  consumesApis:
+    - payments-api

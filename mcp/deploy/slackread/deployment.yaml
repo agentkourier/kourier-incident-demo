@@ -25,7 +25,7 @@ spec:
           args:
             - --server=slackread
             - --slack-ids=/etc/demo-slack-ids/slack-ids.yaml
-            - --channels=checkout-alerts,payments-oncall,incidents
+            - --channels=checkout-alerts,payments-ops,incidents
           env:
             - name: GOMEMLIMIT
               value: 56MiB

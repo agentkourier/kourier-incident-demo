@@ -12,3 +12,4 @@ configMapGenerator:
     files:
       - components.yaml
       - groups.yaml
+      - apis.yaml

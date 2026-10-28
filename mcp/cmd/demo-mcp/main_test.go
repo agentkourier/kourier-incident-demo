@@ -75,7 +75,7 @@ func TestCatalogOverStreamableHTTP(t *testing.T) {
 	_ = json.Unmarshal(raw, &got)
 	want := map[string]any{
 		"service": "payments", "system": "commerce", "team": "payments", "team_display_name": "Payments Team",
-		"slack_channel": "#payments-oncall", "oncall_primary": "Dana", "oncall_secondary": "Lee",
+		"slack_channel": "#payments-ops", "oncall_primary": "Dana", "oncall_secondary": "Lee",
 		"repo": "agentkourier/demo-payments", "tier": "tier-1",
 	}
 	for k, v := range want {

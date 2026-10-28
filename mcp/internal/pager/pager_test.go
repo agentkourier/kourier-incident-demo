@@ -83,7 +83,7 @@ func TestPageMessageFormat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Page: %v", err)
 	}
-	want := Output{Posted: true, Channel: "#payments-oncall", TS: "1730000000.000100"}
+	want := Output{Posted: true, Channel: "#payments-ops", TS: "1730000000.000100"}
 	if out != want {
 		t.Errorf("out = %+v, want %+v", out, want)
 	}
