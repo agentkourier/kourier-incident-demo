@@ -6,35 +6,50 @@ bots and their kagent agents. The payments team ships
 response from integer cents into a decimal string. [demo-checkout](https://github.com/agentkourier/demo-checkout)
 decodes `amount` as `int64`, so every response from v2.14.0 fails in checkout while payments keeps returning 200.
 
-| Bot | Channel | Agent | Starts on | Can change |
-|---|---|---|---|---|
-| checkout-assist | `#checkout-alerts` | `checkout-sre` | Alertmanager's `CheckoutHighErrorRate` post, or a mention | nothing |
-| incident-commander | `#incidents` | `incident-commander` | a mention | posts a page through the Pager app, after a person approves |
-| Agent Kourier (payments) | `#payments-ops` | `payments-sre` | the Pager's page, or a mention | rolls payments back, after a member of the payments user group approves |
+| Bot | Channel | Agent | Starts on | Does without a person | Waits for a person |
+|---|---|---|---|---|---|
+| checkout-assist | `#checkout-alerts` | `checkout-sre` | Alertmanager's `CheckoutHighErrorRate` post, or a mention | investigates; escalates to `#incidents` when the escalation tool's evidence check passes, or asks the checkout on-call | nothing |
+| incident-commander | `#incidents` | `incident-commander` | Pager's escalation or resolved post, or a mention | declares the incident, pages the owning team, writes the summary | nothing |
+| Agent Kourier (payments) | `#payments-ops` | `payments-sre` | the Pager's page, or a mention | confirms the cause, proposes the rollback | the rollback: a member of the payments user group approves |
 
 ## How the incident plays out
 
-Three people take part. The two Slack user groups are what the page mentions and what the rollback approval checks.
+The agents run the hand-off between teams. A person is needed for one routine step, approving the rollback of
+production, and is pulled in earlier only when an agent can't attribute the cause.
 
 | Person | Role | User groups |
 |---|---|---|
-| Priya | checkout on-call: gets the alert, declares the incident, approves the page | none |
-| Dana | payments primary on-call: gets paged, asks for the rollback, approves it | `@payments-oncall`, `@payments-team` |
-| Lee | payments secondary on-call: named in the page's escalation line | `@payments-team` |
+| Priya | checkout on-call: sees the alert and the agents' work; asked for help if the cause can't be confirmed | none |
+| Dana | payments primary on-call: paged, approves the rollback | `@payments-oncall`, `@payments-team` |
+| Lee | payments secondary on-call: named in the page's escalation line, can approve the rollback | `@payments-team` |
 
-The agents read freely. The two actions that change something wait for a person, and Agent Kourier, not the prompt,
-decides who that person can be:
+### Who decides the agent is sure
 
-- **`page_team`** (incident-commander, `#incidents`): any member of `#incidents` can approve.
-- **`rollback_deployment`** (payments bot, `#payments-ops`): only `@payments-team` can approve. Anyone else's press is
-  refused with "Only approvers of this Binding can decide this request." and audited.
+Not the model. `escalate_incident` re-checks the evidence itself with Prometheus and Kubernetes and posts to
+`#incidents` only when every check passes:
+
+1. the impacted service's 5xx ratio is above 5%;
+2. the suspected service rolled out a new ReplicaSet within 15 minutes before the errors began;
+3. the impacted service's calls to the suspected service fail above 50%;
+4. the suspected service's own 5xx ratio is under 5%.
+
+It returns each check with what it measured, and has a `dry_run`. When a check fails, checkout-assist calls
+`ask_oncall`, which replies in the alert thread and mentions the checkout on-call with what it checked and ruled
+out. The alert text an agent reads is untrusted, so a crafted annotation can't talk an agent into escalating. These
+thresholds are this demo's policy, and the third check only knows the checkout → payments client metric.
+
+### The one approval
+
+**`rollback_deployment`** (payments bot, `#payments-ops`): only `@payments-team` can approve, and Agent Kourier, not
+the prompt, enforces it. Anyone else's press is refused with "Only approvers of this Binding can decide this
+request." and audited. incident-commander's Binding has approvals off, so any approval request from it is denied.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Priya as Priya<br/>checkout on-call
     participant AM as Alertmanager
     participant CA as checkout-assist
+    participant ES as escalation tool
     participant IC as incident-commander
     participant PG as Pager
     participant PA as payments bot<br/>(Agent Kourier)
@@ -43,28 +58,26 @@ sequenceDiagram
 
     Note over Pay: v2.14.0 rolls out
     AM->>CA: FIRING (1) - CheckoutHighErrorRate
-    CA-->>Priya: cause: payments v2.14.0, owned by payments
-    Priya->>IC: declare SEV2 + link to the alert thread
-    IC->>CA: read_thread (reads the alert thread)
-    IC-->>Priya: approve page_team(payments, SEV2)?
-    Note over Priya,IC: approval: any member of #incidents
-    Priya->>IC: Approve
-    IC->>PG: page_team
+    CA->>ES: escalate_incident(checkout, payments)
+    Note over ES: checks Prometheus and the rollout, all four pass
+    ES->>IC: Escalation · checkout failing (posted by Pager in #incidents)
+    IC->>PG: page_team(payments, SEV2)
     PG->>Dana: SEV2 for @payments-oncall → paging @Dana
     PG->>PA: the page post starts the payments bot
-    PA-->>Dana: cause + roll back to v2.13.0?
-    Dana->>PA: roll it back
-    Note over Priya,PA: approval: @payments-team only
-    Priya-xPA: Approve → refused, not an approver
+    PA-->>Dana: cause confirmed, rollback to revision 1 needs approval
+    Note over Dana,PA: approval: @payments-team only
     Dana->>PA: Approve
     PA->>Pay: rollback_deployment → v2.13.0
-    Note over Pay: checkout 5xx back to 0
-    Priya->>IC: resolved, write the summary
-    IC-->>Priya: summary from all three channels
+    Note over ES: checkout 5xx under 1% for 2 minutes
+    ES->>IC: Resolved · checkout (posted by Pager in #incidents)
+    IC-->>IC: summary from all three channels
 ```
 
-`read_thread` reads Slack's history of `#checkout-alerts`; it isn't a message to checkout-assist. In a full run on
-this setup, checkout recovered about three minutes after the rollback.
+If the evidence check fails, the chain stops at step 3: `ask_oncall` replies in the alert thread mentioning the
+checkout on-call, and a person can still declare by mentioning incident-commander in `#incidents`.
+
+In a run on this setup the hand-off took about 30 seconds: the alert posted at 20:56:27 UTC, and the rollback
+proposal was waiting for approval at 20:57:02.
 
 ## Where it runs
 
@@ -75,7 +88,7 @@ door), with the tier's sandbox overlay for the model (`make sandbox-up` in an ag
 
 ```
 catalog/          Backstage-style catalog: Components, Groups and the payments API
-mcp/              MCP servers (catalog, pager, rollout, slackread) and their manifests; GitHub and Grafana MCP manifests
+mcp/              MCP servers (catalog, escalation, pager, rollout, slackread) and their manifests; GitHub and Grafana MCP manifests
 observability/    Prometheus, Tempo, OTel collector, Grafana, the alert rule and the Alertmanager route
 loadgen/          load generator for checkout
 agents/           the three kagent agents and their system prompts
@@ -97,8 +110,13 @@ scripts/          rollout, reset, heal
 - Slack channels and members. `#checkout-alerts`: Priya, checkout-assist. `#incidents`: everyone, incident-commander.
   `#payments-ops`: Priya, Dana, Lee, the payments bot. incident-commander must also be a member of `#checkout-alerts`
   and `#payments-ops`, or `read_thread` and `read_recent` fail with `not_in_channel` and it can't see what the other
-  agents found; its Binding still listens only in `#incidents`. Pager needs no membership (`chat:write.public`).
+  agents found; its Binding still listens only in `#incidents`. Pager posts pages in `#payments-ops`, escalations and
+  resolutions in `#incidents`, and questions in `#checkout-alerts` threads; it needs no membership
+  (`chat:write.public`).
   User groups `@payments-oncall` (Dana) and `@payments-team` (Dana, Lee).
+- `ALERT_BOT` in `deploy/kourier/ids.env` is the bot ID of the incoming webhook's posts, not the app's: adding a
+  webhook can give the app a new bot ID. Read it from a real alert post, for example with agent-kourier's
+  `dry-run` subcommand against `#checkout-alerts`.
 - Workspace IDs, which are not committed: `catalog/slack-ids.yaml` (from `slack-ids.example.yaml`) and
   `deploy/kourier/ids.env` (from `ids.example.env`). Load the first and the two bot tokens as Secrets in
   `demo-tools`; see the comment at the top of `mcp/deploy/kustomization.yaml`.
