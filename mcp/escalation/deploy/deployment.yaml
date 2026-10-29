@@ -1,0 +1,65 @@
+# escalate_incident, ask_oncall and the recovery watcher. One replica: the rate limits and the
+# watcher live in memory.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: escalation-mcp
+  namespace: demo-tools
+  labels: {app.kubernetes.io/name: escalation-mcp, app.kubernetes.io/component: mcp-server}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: escalation-mcp}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: escalation-mcp, app.kubernetes.io/component: mcp-server}
+    spec:
+      serviceAccountName: escalation-mcp
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mcp
+          image: demo-mcp:dev
+          imagePullPolicy: IfNotPresent
+          command: [/escalation-mcp]
+          args:
+            - --catalog-dir=/catalog
+            - --slack-ids=/etc/demo-slack-ids/slack-ids.yaml
+            - --allowed-namespace=commerce
+            - --prometheus-url=http://prometheus-server.observability.svc
+            - --incidents-channel=incidents
+            - --ask-channels=checkout-alerts
+          env:
+            - name: GOMEMLIMIT
+              value: 56MiB
+            # The Pager app posts escalations, resolutions and questions.
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef: {name: demo-pager-slack, key: bot-token}
+          ports:
+            - {name: mcp, containerPort: 8084}
+          readinessProbe:
+            httpGet: {path: /healthz, port: mcp}
+          livenessProbe:
+            httpGet: {path: /healthz, port: mcp}
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: catalog, mountPath: /catalog, readOnly: true}
+            - {name: slack-ids, mountPath: /etc/demo-slack-ids, readOnly: true}
+      volumes:
+        - name: catalog
+          configMap: {name: demo-catalog}
+        - name: slack-ids
+          secret: {secretName: demo-slack-ids, items: [{key: slack-ids.yaml, path: slack-ids.yaml}]}

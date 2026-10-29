@@ -26,17 +26,14 @@ production, and is pulled in earlier only when an agent can't attribute the caus
 ### Who decides the agent is sure
 
 Not the model. `escalate_incident` re-checks the evidence itself with Prometheus and Kubernetes and posts to
-`#incidents` only when every check passes:
-
-1. the impacted service's 5xx ratio is above 5%;
-2. the suspected service rolled out a new ReplicaSet within 15 minutes before the errors began;
-3. the impacted service's calls to the suspected service fail above 50%;
-4. the suspected service's own 5xx ratio is under 5%.
+`#incidents` only when every check passes: checkout is failing, payments rolled out within 15 minutes before (or a
+minute after) the errors began, checkout's calls to payments are failing, and payments' own error rate is low. The exact bars are in
+[`mcp/escalation`](mcp/escalation/README.md#who-decides-the-agent-is-sure).
 
 It returns each check with what it measured, and has a `dry_run`. When a check fails, checkout-assist calls
 `ask_oncall`, which replies in the alert thread and mentions the checkout on-call with what it checked and ruled
-out. The alert text an agent reads is untrusted, so a crafted annotation can't talk an agent into escalating. These
-thresholds are this demo's policy, and the third check only knows the checkout → payments client metric.
+out. The alert text an agent reads is untrusted: a crafted annotation can get an agent to call `escalate_incident`,
+but it can't get an escalation posted, because the server posts only when its own checks pass.
 
 ### The one approval
 
@@ -88,7 +85,7 @@ door), with the tier's sandbox overlay for the model (`make sandbox-up` in an ag
 
 ```
 catalog/          Backstage-style catalog: Components, Groups and the payments API
-mcp/              MCP servers (catalog, escalation, pager, rollout, slackread) and their manifests; GitHub and Grafana MCP manifests
+mcp/              the MCP servers: one folder per in-house server (code, cmd, deploy/), upstream/ for GitHub and Grafana
 observability/    Prometheus, Tempo, OTel collector, Grafana, the alert rule and the Alertmanager route
 loadgen/          load generator for checkout
 agents/           the three kagent agents and their system prompts
@@ -96,6 +93,29 @@ deploy/commerce/  payments, checkout
 deploy/kourier/   the three Agent Kourier releases: config, Helm values, install and down scripts
 scripts/          rollout, reset, heal
 ```
+
+## MCP servers
+
+The agents reach everything through MCP servers. Each agent is offered only the tools `agents/agents.yaml` lists for
+it (kagent's filter on each `tools` entry). The demo deploys seven, each with its own Deployment in `demo-tools` and `RemoteMCPServer` in `kagent`;
+`sandbox-tools` comes with the tier's sandbox overlay.
+
+| Server | Code | Agents and tools | What it can reach |
+|---|---|---|---|
+| `catalog-mcp` | [`mcp/catalog`](mcp/catalog) | all three: `lookup_service`; checkout-sre and incident-commander also `list_services` | the catalog ConfigMap, read-only |
+| `escalation-mcp` | [`mcp/escalation`](mcp/escalation) | checkout-sre: `escalate_incident`, `ask_oncall` | Prometheus; Deployments and ReplicaSets in `commerce`, read-only; posts to Slack as Pager |
+| `pager-mcp` | [`mcp/pager`](mcp/pager) | incident-commander: `page_team` | posts to Slack as Pager, one page per team every 10 minutes |
+| `rollout-mcp` | [`mcp/rollout`](mcp/rollout) | payments-sre: `rollout_history`, and `rollback_deployment` behind an approval (kagent's `requireApproval`, decided by the Binding's approvers in Agent Kourier) | Deployments and ReplicaSets in `commerce`, read; RBAC lets it update any Deployment there, and the server rolls back only `payments` |
+| `slackread-mcp` | [`mcp/slackread`](mcp/slackread) | incident-commander: `read_thread`, `read_recent` | reads `#checkout-alerts`, `#payments-ops` and `#incidents` as incident-commander |
+| `grafana-mcp` | upstream, [`mcp/upstream/grafana`](mcp/upstream/grafana) | checkout-sre and payments-sre: Prometheus queries, Tempo traces and trace metrics; checkout-sre also label and attribute lookups | Grafana with a service-account token, write tools off (upstream `--disable-write`) |
+| `github-mcp` | upstream, [`mcp/upstream/github`](mcp/upstream/github) | payments-sre: `list_commits`, `get_commit`, `pull_request_read` | GitHub with the demo's token, read-only, repos and pull requests only (upstream `--read-only` and `--toolsets`) |
+| `sandbox-tools` | agent-kourier's sandbox overlay | checkout-sre and payments-sre: `k8s_*` reads | the cluster, read-only (`view`) |
+
+The five in-house servers build into one image, `demo-mcp:dev`, one binary per server (`/pager-mcp` and so on); each
+Deployment names its binary in `command`. Each server folder holds the package, its command under `cmd/<server>-mcp`,
+its manifests under `deploy/` and a README with its tools, limits, flags and access; `mcp/internal` is the code they
+share (Slack, Prometheus and Kubernetes clients, workspace IDs, serving and the common `main`, test helpers), and
+escalation also reuses the catalog and pager packages. `make -C mcp test` runs their tests.
 
 ## Before `make up`
 
@@ -135,3 +155,7 @@ make reset         # payments back on v2.13.0 with a clean history, between take
 make down          # remove the demo
 make heal          # after a Docker or node restart, if every agent turn says "input was not accepted"
 ```
+
+After a change under `mcp/`, run `make images` and then `make tools`, in that order. The image tag stays
+`demo-mcp:dev`, so `make tools` restarts only the servers whose manifest changed; restart the five in-house servers with
+`kubectl --context kind-agent-kourier-full -n demo-tools rollout restart deployment catalog-mcp escalation-mcp pager-mcp rollout-mcp slackread-mcp`.

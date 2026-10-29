@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pager-mcp
+  namespace: demo-tools
+  labels: {app.kubernetes.io/name: pager-mcp, app.kubernetes.io/component: mcp-server}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: pager-mcp}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: pager-mcp, app.kubernetes.io/component: mcp-server}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mcp
+          image: demo-mcp:dev
+          imagePullPolicy: IfNotPresent
+          command: [/pager-mcp]
+          args:
+            - --catalog-dir=/catalog
+            - --slack-ids=/etc/demo-slack-ids/slack-ids.yaml
+          env:
+            - name: GOMEMLIMIT
+              value: 56MiB
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef: {name: demo-pager-slack, key: bot-token}
+          ports:
+            - {name: mcp, containerPort: 8084}
+          readinessProbe:
+            httpGet: {path: /healthz, port: mcp}
+          livenessProbe:
+            httpGet: {path: /healthz, port: mcp}
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: catalog, mountPath: /catalog, readOnly: true}
+            - {name: slack-ids, mountPath: /etc/demo-slack-ids, readOnly: true}
+      volumes:
+        - name: catalog
+          configMap: {name: demo-catalog}
+        - name: slack-ids
+          secret: {secretName: demo-slack-ids, items: [{key: slack-ids.yaml, path: slack-ids.yaml}]}

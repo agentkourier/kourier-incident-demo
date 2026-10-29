@@ -1,5 +1,7 @@
 bin/
 deploy/
+*/deploy/
+upstream/
 Dockerfile
 Makefile
 **/*_test.go
