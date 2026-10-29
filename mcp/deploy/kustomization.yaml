@@ -1,5 +1,6 @@
-# The incident demo's MCP tool servers. Every server runs in namespace demo-tools and is registered
-# with kagent as a RemoteMCPServer in namespace kagent. Nothing here creates a Secret: the Secrets
+# Every MCP server the demo deploys: the five built in this module (each folder's deploy/) and the two
+# upstream ones (upstream/). Every server runs in namespace demo-tools and is registered with kagent
+# as a RemoteMCPServer in namespace kagent. Nothing here creates a Secret: the Secrets
 # below are referenced by name only. Create them out of band, for example:
 #
 #   kubectl -n demo-tools create secret generic demo-pager-slack --from-literal=bot-token=xoxb-...
@@ -18,11 +19,11 @@ labels:
       app.kubernetes.io/part-of: kourier-incident-demo
 resources:
   - namespace.yaml
-  - ../../catalog
-  - catalog
-  - escalation
-  - pager
-  - rollout
-  - slackread
-  - github
-  - grafana
+  - ../../catalog      # the catalog data, as ConfigMap demo-catalog
+  - ../catalog/deploy
+  - ../escalation/deploy
+  - ../pager/deploy
+  - ../rollout/deploy
+  - ../slackread/deploy
+  - ../upstream/github
+  - ../upstream/grafana

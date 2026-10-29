@@ -15,8 +15,8 @@ vet: ## go vet
 test: vet ## vet, then race-enabled tests
 	go test -race ./...
 
-build: ## build bin/demo-mcp
-	CGO_ENABLED=0 go build -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/demo-mcp ./cmd/demo-mcp
+build: ## build one binary per server into bin/
+	CGO_ENABLED=0 go build -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/ ./...
 
 image: ## build the $(IMAGE) container image
 	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE) .

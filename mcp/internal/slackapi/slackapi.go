@@ -16,6 +16,9 @@ import (
 // DefaultBaseURL is the Slack Web API base URL.
 const DefaultBaseURL = "https://slack.com/api"
 
+// TokenEnv names the environment variable a server reads its Slack bot token from.
+const TokenEnv = "SLACK_BOT_TOKEN"
+
 // maxResponseBytes caps how much of a Slack response is read.
 const maxResponseBytes = 4 << 20
 
