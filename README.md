@@ -26,17 +26,13 @@ production, and is pulled in earlier only when an agent can't attribute the caus
 ### Who decides the agent is sure
 
 Not the model. `escalate_incident` re-checks the evidence itself with Prometheus and Kubernetes and posts to
-`#incidents` only when every check passes:
-
-1. the impacted service's 5xx ratio is above 5%;
-2. the suspected service rolled out a new ReplicaSet within 15 minutes before the errors began;
-3. the impacted service's calls to the suspected service fail above 50%;
-4. the suspected service's own 5xx ratio is under 5%.
+`#incidents` only when every check passes: checkout is failing, payments rolled out just before the errors began,
+checkout's calls to payments are failing, and payments' own error rate is low. The exact bars are in
+[`mcp/escalation`](mcp/escalation/README.md#who-decides-the-agent-is-sure).
 
 It returns each check with what it measured, and has a `dry_run`. When a check fails, checkout-assist calls
 `ask_oncall`, which replies in the alert thread and mentions the checkout on-call with what it checked and ruled
-out. The alert text an agent reads is untrusted, so a crafted annotation can't talk an agent into escalating. These
-thresholds are this demo's policy, and the third check only knows the checkout → payments client metric.
+out. The alert text an agent reads is untrusted, so a crafted annotation can't talk an agent into escalating.
 
 ### The one approval
 
@@ -114,11 +110,11 @@ it (kagent's filter on each `tools` entry). The demo deploys seven, each with it
 | `github-mcp` | upstream, [`mcp/upstream/github`](mcp/upstream/github) | payments-sre: `list_commits`, `get_commit`, `pull_request_read` | GitHub with the demo's token, read-only, repos and pull requests only |
 | `sandbox-tools` | agent-kourier's sandbox overlay | checkout-sre and payments-sre: `k8s_*` reads | the cluster, read-only (`view`) |
 
-The five in-house servers build into one image, `demo-mcp:dev`, one binary per server (`/pager-mcp` and so on);
-each Deployment names its binary in `command`. Each server folder holds the package, its command under
-`cmd/<server>-mcp` and its manifests under `deploy/`; `mcp/internal` is the code they share (Slack, Prometheus and
-Kubernetes clients, workspace IDs, serving and the common `main`, test helpers), and escalation also reuses the
-catalog and pager packages. `make -C mcp test` runs their tests.
+The five in-house servers build into one image, `demo-mcp:dev`, one binary per server (`/pager-mcp` and so on); each
+Deployment names its binary in `command`. Each server folder holds the package, its command under `cmd/<server>-mcp`,
+its manifests under `deploy/` and a README with its tools, limits, flags and access; `mcp/internal` is the code they
+share (Slack, Prometheus and Kubernetes clients, workspace IDs, serving and the common `main`, test helpers), and
+escalation also reuses the catalog and pager packages. `make -C mcp test` runs their tests.
 
 ## Before `make up`
 
