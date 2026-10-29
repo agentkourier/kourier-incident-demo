@@ -50,15 +50,21 @@ func register(s *mcp.Server, c config) error {
 	return slackread.Register(s, r)
 }
 
-func main() {
-	var c config
+// newFlags returns the command's flag set and the config it parses into.
+func newFlags() (*flag.FlagSet, *config) {
+	c := &config{}
 	fs := flag.NewFlagSet("slackread-mcp", flag.ContinueOnError)
 	fs.StringVar(&c.slackIDs, "slack-ids", "/etc/demo-slack-ids/slack-ids.yaml", "workspace Slack IDs file")
 	fs.StringVar(&c.slackAPI, "slack-api-url", slackapi.DefaultBaseURL, "Slack Web API base URL")
 	fs.StringVar(&c.channels, "channels", "checkout-alerts,payments-ops,incidents", "comma-separated channel names that may be read")
 	fs.StringVar(&c.timezone, "tz", "UTC", "IANA time zone for message times")
+	return fs, c
+}
+
+func main() {
+	fs, c := newFlags()
 	mcpserve.Main(fs, version, func(_ context.Context, s *mcp.Server, _ *slog.Logger) error {
 		c.slackToken = os.Getenv(slackapi.TokenEnv)
-		return register(s, c)
+		return register(s, *c)
 	})
 }

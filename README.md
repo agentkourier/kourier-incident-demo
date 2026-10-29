@@ -99,8 +99,8 @@ scripts/          rollout, reset, heal
 
 ## MCP servers
 
-The agents reach everything through MCP servers, and each agent gets only the tools `agents/agents.yaml` lists for
-it. The demo deploys seven, each with its own Deployment in `demo-tools` and `RemoteMCPServer` in `kagent`;
+The agents reach everything through MCP servers. Each agent is offered only the tools `agents/agents.yaml` lists for
+it (kagent's filter on each `tools` entry). The demo deploys seven, each with its own Deployment in `demo-tools` and `RemoteMCPServer` in `kagent`;
 `sandbox-tools` comes with the tier's sandbox overlay.
 
 | Server | Code | Agents and tools | What it can reach |
@@ -108,16 +108,17 @@ it. The demo deploys seven, each with its own Deployment in `demo-tools` and `Re
 | `catalog-mcp` | [`mcp/catalog`](mcp/catalog) | all three: `lookup_service`; checkout-sre and incident-commander also `list_services` | the catalog ConfigMap, read-only |
 | `escalation-mcp` | [`mcp/escalation`](mcp/escalation) | checkout-sre: `escalate_incident`, `ask_oncall` | Prometheus; Deployments and ReplicaSets in `commerce`, read-only; posts to Slack as Pager |
 | `pager-mcp` | [`mcp/pager`](mcp/pager) | incident-commander: `page_team` | posts to Slack as Pager, one page per team every 10 minutes |
-| `rollout-mcp` | [`mcp/rollout`](mcp/rollout) | payments-sre: `rollout_history`, and `rollback_deployment` behind an approval | Deployments in `commerce`: reads them, rolls back `payments` only |
+| `rollout-mcp` | [`mcp/rollout`](mcp/rollout) | payments-sre: `rollout_history`, and `rollback_deployment` behind an approval | Deployments and ReplicaSets in `commerce`, read; rolls back `payments` only |
 | `slackread-mcp` | [`mcp/slackread`](mcp/slackread) | incident-commander: `read_thread`, `read_recent` | reads `#checkout-alerts`, `#payments-ops` and `#incidents` as incident-commander |
-| `grafana-mcp` | upstream, [`mcp/upstream/grafana`](mcp/upstream/grafana) | checkout-sre and payments-sre: Prometheus queries, Tempo traces | Grafana with a service-account token, write tools off |
+| `grafana-mcp` | upstream, [`mcp/upstream/grafana`](mcp/upstream/grafana) | checkout-sre and payments-sre: Prometheus queries, Tempo traces and trace metrics; checkout-sre also label and attribute lookups | Grafana with a service-account token, write tools off |
 | `github-mcp` | upstream, [`mcp/upstream/github`](mcp/upstream/github) | payments-sre: `list_commits`, `get_commit`, `pull_request_read` | GitHub with the demo's token, read-only, repos and pull requests only |
 | `sandbox-tools` | agent-kourier's sandbox overlay | checkout-sre and payments-sre: `k8s_*` reads | the cluster, read-only (`view`) |
 
 The five in-house servers build into one image, `demo-mcp:dev`, one binary per server (`/pager-mcp` and so on);
 each Deployment names its binary in `command`. Each server folder holds the package, its command under
-`cmd/<server>-mcp` and its manifests under `deploy/`; `mcp/internal` is the code they share (Slack and Prometheus
-clients, workspace IDs, serving). `make -C mcp test` runs their tests.
+`cmd/<server>-mcp` and its manifests under `deploy/`; `mcp/internal` is the code they share (Slack, Prometheus and
+Kubernetes clients, workspace IDs, serving and the common `main`, test helpers), and escalation also reuses the
+catalog and pager packages. `make -C mcp test` runs their tests.
 
 ## Before `make up`
 
@@ -157,3 +158,7 @@ make reset         # payments back on v2.13.0 with a clean history, between take
 make down          # remove the demo
 make heal          # after a Docker or node restart, if every agent turn says "input was not accepted"
 ```
+
+After a change under `mcp/`, run `make images` and then `make tools`, in that order. The image tag stays
+`demo-mcp:dev`, so `make tools` restarts only the servers whose manifest changed; restart the others with
+`kubectl --context kind-agent-kourier-full -n demo-tools rollout restart deployment -l app.kubernetes.io/component=mcp-server`.

@@ -29,9 +29,15 @@ func register(s *mcp.Server, c config) error {
 	return nil
 }
 
-func main() {
-	var c config
+// newFlags returns the command's flag set and the config it parses into.
+func newFlags() (*flag.FlagSet, *config) {
+	c := &config{}
 	fs := flag.NewFlagSet("catalog-mcp", flag.ContinueOnError)
 	fs.StringVar(&c.catalogDir, "catalog-dir", "/catalog", "directory of Backstage-style catalog YAML")
-	mcpserve.Main(fs, version, func(_ context.Context, s *mcp.Server, _ *slog.Logger) error { return register(s, c) })
+	return fs, c
+}
+
+func main() {
+	fs, c := newFlags()
+	mcpserve.Main(fs, version, func(_ context.Context, s *mcp.Server, _ *slog.Logger) error { return register(s, *c) })
 }

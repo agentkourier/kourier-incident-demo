@@ -1,4 +1,6 @@
-// Package mcpserve serves an MCP server over Streamable HTTP at /mcp, with /healthz for probes.
+// Package mcpserve is what every demo MCP server binary shares: serving over Streamable HTTP at /mcp,
+// with /healthz for probes, and the main function (Main) that parses the common flags, builds the
+// server and shuts it down on SIGTERM.
 package mcpserve
 
 import (

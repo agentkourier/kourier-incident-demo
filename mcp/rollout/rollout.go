@@ -184,6 +184,8 @@ func (s *Service) Rollback(ctx context.Context, ns, name string, toRevision int6
 		}
 	}
 	// Update carries d's resourceVersion, so a concurrent change makes this fail rather than be overwritten.
+	// The field manager keeps the old binary's name on purpose: Deployments this server has already
+	// rolled back record it in managedFields, and a new name would split their entries in two.
 	if _, err := s.client.AppsV1().Deployments(ns).Update(ctx, updated, metav1.UpdateOptions{FieldManager: "demo-mcp-rollout"}); err != nil {
 		return RollbackResult{}, fmt.Errorf("update deployment %s/%s: %w", ns, name, err)
 	}

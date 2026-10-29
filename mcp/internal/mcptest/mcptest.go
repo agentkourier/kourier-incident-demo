@@ -1,15 +1,21 @@
-// Package mcptest connects an MCP client to a server over real Streamable HTTP, for the servers'
-// command tests.
+// Package mcptest helps the servers' command tests: it connects an MCP client over real Streamable
+// HTTP, and checks a command's flags against its Deployment manifest.
 package mcptest
 
 import (
 	"context"
+	"errors"
+	"flag"
+	"io"
 	"log/slog"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	appsv1 "k8s.io/api/apps/v1"
+	"sigs.k8s.io/yaml"
 
 	"github.com/agentkourier/kourier-incident-demo/mcp/internal/mcpserve"
 )
@@ -43,4 +49,36 @@ func Text(res *mcp.CallToolResult) string {
 		}
 	}
 	return b.String()
+}
+
+// errParsed stops mcpserve.Run once the command line is parsed.
+var errParsed = errors.New("parsed")
+
+// Parse runs fs over args through mcpserve.Run, as the command's main does, and stops before the
+// server is built. It fails the test when the command line does not parse.
+func Parse(t testing.TB, fs *flag.FlagSet, args []string) {
+	t.Helper()
+	err := mcpserve.Run(context.Background(), fs, args, io.Discard, "test",
+		func(context.Context, *mcp.Server, *slog.Logger) error { return errParsed })
+	if !errors.Is(err, errParsed) {
+		t.Fatalf("parse %v: %v", args, err)
+	}
+}
+
+// Deployment returns the container command and args of the one-container Deployment manifest at path.
+func Deployment(t testing.TB, path string) (command, args []string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var d appsv1.Deployment
+	if err := yaml.UnmarshalStrict(data, &d); err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	if n := len(d.Spec.Template.Spec.Containers); n != 1 {
+		t.Fatalf("%s: %d containers, want 1", path, n)
+	}
+	c := d.Spec.Template.Spec.Containers[0]
+	return c.Command, c.Args
 }

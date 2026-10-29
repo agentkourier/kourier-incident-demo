@@ -67,8 +67,9 @@ func register(ctx context.Context, s *mcp.Server, logger *slog.Logger, c config,
 	return escalation.Register(s, e)
 }
 
-func main() {
-	var c config
+// newFlags returns the command's flag set and the config it parses into.
+func newFlags() (*flag.FlagSet, *config) {
+	c := &config{}
 	fs := flag.NewFlagSet("escalation-mcp", flag.ContinueOnError)
 	fs.StringVar(&c.catalogDir, "catalog-dir", "/catalog", "directory of Backstage-style catalog YAML")
 	fs.StringVar(&c.slackIDs, "slack-ids", "/etc/demo-slack-ids/slack-ids.yaml", "workspace Slack IDs file")
@@ -77,8 +78,13 @@ func main() {
 	fs.StringVar(&c.prometheusURL, "prometheus-url", "http://prometheus-server.observability.svc", "Prometheus base URL")
 	fs.StringVar(&c.incidentsChannel, "incidents-channel", "incidents", "channel name escalations and resolutions are posted to")
 	fs.StringVar(&c.askChannels, "ask-channels", "checkout-alerts", "comma-separated channel names ask_oncall may reply in")
+	return fs, c
+}
+
+func main() {
+	fs, c := newFlags()
 	mcpserve.Main(fs, version, func(ctx context.Context, s *mcp.Server, logger *slog.Logger) error {
 		c.slackToken = os.Getenv(slackapi.TokenEnv)
-		return register(ctx, s, logger, c, kubeclient.InCluster)
+		return register(ctx, s, logger, *c, kubeclient.InCluster)
 	})
 }
