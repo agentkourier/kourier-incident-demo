@@ -14,7 +14,8 @@ Both are read-only.
 
 ## Data
 
-At startup the server reads every YAML file in `--catalog-dir`: Backstage `Component` entities are services,
+At startup the server reads every YAML file in `--catalog-dir` except `*.example.yaml`, `slack-ids*` and
+`kustomization*`: Backstage `Component` entities are services,
 `Group` entities are teams, and other kinds (the payments `API`) are skipped. It does not re-read the files.
 
 The files are the repository's [`catalog/`](../../catalog), packed into the ConfigMap `demo-catalog` with a

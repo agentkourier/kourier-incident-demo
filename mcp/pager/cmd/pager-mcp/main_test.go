@@ -70,12 +70,23 @@ func TestOverStreamableHTTP(t *testing.T) {
 }
 
 func TestRejectsMissingInputs(t *testing.T) {
-	for name, c := range map[string]config{
-		"no slack-ids file": {catalogDir: repoCatalog, slackIDs: "/nonexistent", slackToken: "xoxb-fake-test-token"},
-		"no token":          {catalogDir: repoCatalog, slackIDs: "../../../../catalog/slack-ids.example.yaml"},
+	ok := config{catalogDir: repoCatalog, slackIDs: "../../../../catalog/slack-ids.example.yaml", slackToken: "xoxb-fake-test-token"}
+	if err := register(mcptest.NewServer(), ok); err != nil {
+		t.Fatalf("good config: %v", err)
+	}
+	noIDs := ok
+	noIDs.slackIDs = "/nonexistent"
+	noToken := ok
+	noToken.slackToken = ""
+	for name, tc := range map[string]struct {
+		c    config
+		want string
+	}{
+		"no slack-ids file": {noIDs, "nonexistent"},
+		"no token":          {noToken, "SLACK_BOT_TOKEN is not set"},
 	} {
-		if err := register(mcptest.NewServer(), c); err == nil {
-			t.Errorf("%s: started", name)
+		if err := register(mcptest.NewServer(), tc.c); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: err = %v, want it to mention %q", name, err, tc.want)
 		}
 	}
 }

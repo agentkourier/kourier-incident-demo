@@ -1,6 +1,7 @@
 # pager-mcp
 
-Pages a team's on-call in Slack, as the Pager app. incident-commander calls it once it has declared an incident.
+Pages a team's on-call in Slack, as the Pager app. incident-commander's prompt has it page the owning team once it
+has declared an incident.
 
 ## Tool
 
@@ -15,7 +16,8 @@ Alert thread
 ```
 
 - The tool writes the message. Mentions and the channel come only from the `demo-slack-ids` Secret; a team without
-  IDs there is an error and nothing is posted. The second line is text only: nothing in the demo escalates.
+  IDs there is an error and nothing is posted. The on-call group is mentioned only when the Secret has one, and the
+  second line appears only when it names a secondary. The second line is text only: nothing in the demo escalates.
 - `summary` comes from a model and is treated as untrusted: control and format characters are stripped, it is cut
   to 300 characters, and `&`, `<` and `>` are escaped, so it can't mention anyone.
 - `incident_link` is kept only when it is an https link on `slack.com`; otherwise it is left out and the result
@@ -34,5 +36,6 @@ Alert thread
 | `--version` | | print the version and exit |
 
 `SLACK_BOT_TOKEN` is the Pager app's bot token, from Secret `demo-pager-slack` (key `bot-token`); the server
-does not start without it. Pager needs `chat:write` and `chat:write.public`, not channel membership. No Kubernetes
+does not start without it. Pager has `chat:write` and `chat:write.public`; with the second, Slack lets it post in
+public channels it hasn't joined (Slack's behaviour). No Kubernetes
 access. Tests: `go test ./pager/...` from `mcp/`.

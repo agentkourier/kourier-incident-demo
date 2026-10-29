@@ -1,7 +1,7 @@
 # rollout-mcp
 
-Reads a Deployment's rollout history and rolls it back, the way `kubectl rollout history` and
-`kubectl rollout undo --to-revision` do. payments-sre uses it to name the bad revision and undo it.
+Reads a Deployment's rollout history and rolls it back, modelled on `kubectl rollout history` and
+`kubectl rollout undo --to-revision` (the code follows kubectl's rollback, including which annotations it copies). payments-sre uses it to name the bad revision and undo it.
 
 ## Tools
 
@@ -14,8 +14,8 @@ Reads a Deployment's rollout history and rolls it back, the way `kubectl rollout
   `rollback_deployment` only the ones in `--allowed-deployments`.
 - `rollback_deployment` refuses a paused Deployment and a revision that does not exist, and changes nothing when
   the revision is already the current template. `dry_run` reports what would change.
-- The update carries the Deployment's resourceVersion, so a concurrent change makes the rollback fail instead of
-  being overwritten.
+- The update carries the Deployment's resourceVersion, so the API server rejects it if the Deployment changed in
+  between (Kubernetes' optimistic concurrency), and the rollback fails instead of overwriting that change.
 - The approval is not here. payments-sre's `agents.yaml` entry marks `rollback_deployment` `requireApproval`, and
   Agent Kourier lets only the Binding's approvers (`@payments-team`) approve it.
 

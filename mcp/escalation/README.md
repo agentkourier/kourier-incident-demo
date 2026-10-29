@@ -16,26 +16,29 @@ posts to `#incidents` only when every check passes:
 | `suspect_own_errors_low` | the suspected service's own 5xx ratio is under 5% |
 
 - The 5xx ratios read `http_requests_total` in `--allowed-namespace`, leaving out `/healthz`, `/readyz`, `/livez`
-  and `/metrics`. When the errors began is the first sample above 5% after the ratio had been at or under it for
-  more than a minute, looking back up to an hour.
+  and `/metrics`. The errors began at the start of the latest run of 15-second samples above 5%, where a gap of
+  more than a minute between such samples starts a new run. It looks back an hour; errors that have run longer than
+  that count from the start of the hour.
 - The third check knows only the checkout → payments client metric (`payments_client_requests_total`); for any
   other pair it fails and says there is no metric.
 - The result lists each check with what it measured. A failed check is a result, not an error, and nothing is
   posted. `dry_run` runs the checks and posts nothing.
-- The alert text an agent reads is untrusted, so a crafted annotation can't talk an agent into escalating. These
-  thresholds are this demo's policy, constants in [`escalation.go`](escalation.go).
+- The alert text an agent reads is untrusted: a crafted annotation can get an agent to call `escalate_incident`,
+  but it can't get an escalation posted, because the server posts only when its own checks pass. These thresholds
+  are this demo's policy, constants in [`escalation.go`](escalation.go).
 
 ## Tools
 
 | Tool | Input | Does |
 |---|---|---|
 | `escalate_incident` | `impacted_service`, `suspected_service`, `summary`, optional `alert_thread_link`, `dry_run` | the checks above; when they pass, posts the escalation to `--incidents-channel` |
-| `ask_oncall` | `team`, `summary`, `alert_thread_link` | replies in the alert's thread, mentioning the team's on-call group and primary on-call |
+| `ask_oncall` | `team`, `summary`, `alert_thread_link` | replies in the alert's thread, mentioning the team's primary on-call, and its on-call group when the `demo-slack-ids` Secret has one |
 
 - Both services must be in the catalog and differ. The tool writes every message: `summary` is cleaned the way
   `page_team` cleans it, and mentions come only from the `demo-slack-ids` Secret.
-- `ask_oncall` replies only in threads of `--ask-channels`, and its link must be a Slack message link
-  (`https://….slack.com/archives/<channel>/p<ts>`).
+- `ask_oncall` has no evidence check: only the channel allowlist and the rate limit below bound it. It replies only
+  in threads of `--ask-channels`, and its link must be an https message link on `slack.com` or a subdomain of it
+  (`/archives/<channel>/p<ts>`); a `thread_ts` query parameter, as in a reply's link, names the thread.
 - At most one escalation per impacted service every 30 minutes, and one question per thread every 10 minutes.
 - After an escalation it posts, the server watches the impacted service every 15 seconds and posts "Resolved" to
   `#incidents` once its 5xx ratio has stayed under 1% for 2 minutes. It stops watching after an hour.
