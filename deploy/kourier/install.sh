@@ -3,11 +3,18 @@
 #   agent-kourier-demo-checkout  checkout-assist     (Slack app tokens: ~/.config/agent-kourier/demo-checkout-assist.env)
 #   agent-kourier-demo-ic        incident-commander  (~/.config/agent-kourier/demo-incident-commander.env)
 #   agent-kourier-demo-payments  payments-assist     (~/.config/agent-kourier/demo-payments-assist.env)
-# Needs AGENT_KOURIER_CHECKOUT (an agent-kourier checkout, for the chart). Never prints a token.
+# Installs the released chart AGENT_KOURIER_VERSION (default 0.1.5) from ghcr.io, which pins its own image by digest.
+# With AGENT_KOURIER_CHECKOUT set, it installs that checkout's chart with the local agent-kourier:dev image instead
+# (load it into kind first). Never prints a token.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 ctx=${KUBE_CONTEXT:-kind-agent-kourier-full}
-ak=${AGENT_KOURIER_CHECKOUT:?set AGENT_KOURIER_CHECKOUT to an agent-kourier checkout (for charts/agent-kourier)}
+if [ -n "${AGENT_KOURIER_CHECKOUT:-}" ]; then
+  chart=("$AGENT_KOURIER_CHECKOUT/charts/agent-kourier" --set image.repository=agent-kourier --set image.tag=dev
+         --set image.pullPolicy=Never)
+else
+  chart=(oci://ghcr.io/agentkourier/charts/agent-kourier --version "${AGENT_KOURIER_VERSION:-0.1.5}")
+fi
 cfg=${DEMO_SECRETS_DIR:-$HOME/.config/agent-kourier}
 K=(kubectl --context "$ctx" -n agent-kourier)
 "$here/render.sh"
@@ -44,7 +51,7 @@ for name in checkout ic payments; do
   # The refresh CronJob patches the token Secret and cannot create it; the bring-up Job below fills it.
   "${K[@]}" get secret "$rel-token" >/dev/null 2>&1 || secret "$rel-token" "token=literal:pending"
   "${K[@]}" create configmap "$rel-config" --from-file="$here/rendered/$name" --dry-run=client -o yaml | "${K[@]}" apply -f - >/dev/null
-  helm --kube-context "$ctx" upgrade --install "$rel" "$ak/charts/agent-kourier" -n agent-kourier -f "$here/values.yaml" \
+  helm --kube-context "$ctx" upgrade --install "$rel" "${chart[@]}" -n agent-kourier -f "$here/values.yaml" \
     --set config.existingConfigMap="$rel-config" --set tokenRefresh.targetSecret="$rel-token" \
     --set tokenRefresh.dex.credentialsSecret="$rel-dex-client" --wait --timeout 4m >/dev/null
   "${K[@]}" delete job "$rel-token-bringup" --ignore-not-found >/dev/null
