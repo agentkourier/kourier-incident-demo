@@ -8,9 +8,9 @@ decodes `amount` as `int64`, so every response from v2.14.0 fails in checkout wh
 
 | Bot | Channel | Agent | Starts on | Does without a person | Waits for a person |
 |---|---|---|---|---|---|
-| checkout-assist | `#checkout-alerts` | `checkout-sre` | Alertmanager's `CheckoutHighErrorRate` post, or a mention | investigates; escalates to `#incidents` when the escalation tool's evidence check passes, or asks the checkout on-call | nothing |
-| incident-commander | `#incidents` | `incident-commander` | Pager's escalation or resolved post, or a mention | declares the incident, pages the owning team, writes the summary | nothing |
-| payments-assist | `#payments-ops` | `payments-sre` | the Pager's page, or a mention | confirms the cause, proposes the rollback | the rollback: a member of the payments user group approves |
+| checkout-assist | `#checkout-alerts` | `checkout-sre` | Alertmanager's `CheckoutHighErrorRate` post, or a mention | investigates (pods, logs, metrics, traces), looks the suspect up in the catalog; escalates to `#incidents` when the escalation tool's evidence check passes, or asks the checkout on-call | nothing |
+| incident-commander | `#incidents` | `incident-commander` | Pager's escalation or resolved post, or a mention | reads the alert thread, declares the incident, looks up the owning team and pages it, writes the summary | nothing |
+| payments-assist | `#payments-ops` | `payments-sre` | the Pager's page, or a mention | confirms the cause from the rollout history, the metrics and the source (the release's commits, the diff, the pull request), proposes the rollback | the rollback: a member of the payments user group approves |
 
 ## How the incident plays out
 
@@ -50,20 +50,23 @@ sequenceDiagram
     participant IC as incident-commander
     participant PG as Pager
     participant PA as payments-assist
-    actor Dana as Dana<br/>payments on-call
+    actor Ops as Dana, Lee<br/>payments on-call
     participant Pay as payments<br/>Deployment
 
     Note over Pay: v2.14.0 rolls out
     AM->>CA: FIRING (1) - CheckoutHighErrorRate
+    Note over CA: pods, logs, metrics, traces,<br/>then lookup_service(payments)
     CA->>ES: escalate_incident(checkout, payments)
     Note over ES: checks Prometheus and the rollout, all four pass
     ES->>IC: Escalation · checkout failing (posted by Pager in #incidents)
+    Note over IC: read_thread (the alert thread),<br/>lookup_service(payments): Payments Team
     IC->>PG: page_team(payments, SEV2)
-    PG->>Dana: SEV2 for @payments-oncall → paging @Dana
+    PG->>Ops: SEV2 for @payments-oncall → paging @Dana, Lee named as secondary
     PG->>PA: the page post starts payments-assist
-    PA-->>Dana: cause confirmed, rollback to revision 1 needs approval
-    Note over Dana,PA: approval: @payments-team only
-    Dana->>PA: Approve
+    Note over PA: rollout_history, Prometheus, then GitHub:<br/>list_commits, get_commit, pull_request_read
+    PA-->>Ops: cause confirmed, rollback to revision 1 needs approval
+    Note over Ops,PA: approval: @payments-team only
+    Ops->>PA: Approve
     PA->>Pay: rollback_deployment → v2.13.0
     Note over ES: checkout 5xx under 1% for 2 minutes
     ES->>IC: Resolved · checkout (posted by Pager in #incidents)
@@ -73,8 +76,10 @@ sequenceDiagram
 If the evidence check fails, the chain stops at step 3: `ask_oncall` replies in the alert thread mentioning the
 checkout on-call, and a person can still declare by mentioning incident-commander in `#incidents`.
 
-In a run on this setup the hand-off took about 30 seconds: the alert posted at 20:56:27 UTC, and the rollback
-proposal was waiting for approval at 20:57:02.
+In the recorded run (UTC): payments v2.14.0 rolled out at 22:09:24 and the alert posted at 22:12:13. checkout-assist
+escalated at 22:13:01, payments was paged at 22:13:10, and the rollback proposal was waiting for approval at 22:13:29,
+76 seconds after the alert. Lee approved at 22:15:58, and checkout's errors were under 1% by 22:17:16, about five
+minutes from alert to recovery.
 
 ## Where it runs
 
@@ -152,7 +157,7 @@ escalation also reuses the catalog and pager packages. `make -C mcp test` runs t
 
 ```sh
 make up            # observability, tools, agents, commerce, the three releases
-make rollout-bad   # payments v2.14.0: checkout fails, CheckoutHighErrorRate fires about 2 minutes later
+make rollout-bad   # payments v2.14.0: checkout fails, CheckoutHighErrorRate fires 2 to 3 minutes later
 make reset         # payments back on v2.13.0 with a clean history, between takes
 make down          # remove the demo
 make heal          # after a Docker or node restart, if every agent turn says "input was not accepted"
