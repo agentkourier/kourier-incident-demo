@@ -1,8 +1,8 @@
 # The incident demo on agent-kourier's kind full tier (context kind-agent-kourier-full). See README.md.
 KUBE_CONTEXT ?= kind-agent-kourier-full
-AGENT_KOURIER_CHECKOUT ?= ../agent-courier
+AGENT_KOURIER_VERSION ?= 0.1.5
 K := kubectl --context $(KUBE_CONTEXT)
-export KUBE_CONTEXT AGENT_KOURIER_CHECKOUT
+export KUBE_CONTEXT AGENT_KOURIER_VERSION AGENT_KOURIER_CHECKOUT
 
 .PHONY: help up observability tools agents commerce kourier down reset rollout-bad rollout-good heal status images
 help: ## List the targets

@@ -1,9 +1,5 @@
-# Shared Helm values for the demo's three Agent Kourier releases (chart charts/agent-kourier from an agent-kourier
-# checkout). install.sh adds the per-release names on the command line.
-image:
-  repository: agent-kourier
-  tag: dev
-  pullPolicy: Never
+# Shared Helm values for the demo's three Agent Kourier releases. install.sh picks the chart (the release, or an
+# agent-kourier checkout's with the local image) and adds the per-release names on the command line.
 rbac:
   secretNamespaces: [agent-kourier]
 persistence:

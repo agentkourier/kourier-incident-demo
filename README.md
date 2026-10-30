@@ -119,8 +119,10 @@ escalation also reuses the catalog and pager packages. `make -C mcp test` runs t
 
 ## Before `make up`
 
-- The kind full tier with the sandbox overlay is up, and agent-kourier's `agent-kourier:dev` image is loaded.
-  `AGENT_KOURIER_CHECKOUT` points at that checkout (default `../agent-courier`), for the Helm chart.
+- The kind full tier with the sandbox overlay is up. `make kourier` installs the released Agent Kourier chart
+  `AGENT_KOURIER_VERSION` (default 0.1.5) from `oci://ghcr.io/agentkourier/charts`, which pins its image by digest.
+  To run an unreleased build instead, set `AGENT_KOURIER_CHECKOUT` to an agent-kourier checkout: that checkout's
+  chart is installed with the local `agent-kourier:dev` image (`make image` there, then load it into kind).
 - Images built and loaded into kind: `demo-payments:v2.13.0`, `demo-payments:v2.14.0` and `demo-checkout:v1.8.0`
   (`make image VERSION=…` in the service repos at their tags), then `make images` here.
 - Four Slack apps: checkout-assist, incident-commander and payments-assist (Socket Mode, the sandbox app's scopes),
